@@ -17,7 +17,7 @@ DocuMind is an AI-powered documentation agent designed to bridge the gap between
    ```
 2. **Setup AI (Optional but Recommended):**
    - Copy `.env.local.example` to `.env.local`.
-   - Add your `AI_API_KEY` (OpenAI compatible) to enable deep architectural analysis.
+   - Add your `GEMINI_API_KEY` (from Google AI Studio) to enable deep architectural analysis.
    - *If no key is provided, the system uses "Heuristic Parsing" to derive logic roles.*
 3. **Run Development:**
    ```bash
@@ -31,7 +31,7 @@ DocuMind is an AI-powered documentation agent designed to bridge the gap between
 - **Framework:** [Next.js 14](https://nextjs.org/) (App Router)
 - **Graph Engine:** [React Flow](https://reactflow.dev/) (Interactive orchestration)
 - **Static Analysis:** [ts-morph](https://ts-morph.com/) (TypeScript AST discovery)
-- **AI Layer:** [OpenAI SDK](https://github.com/openai/openai-node) (Architectural reasoning)
+- **AI Layer:** [Google Generative AI SDK](https://github.com/google/generative-ai-js) (Architectural reasoning via Gemini)
 - **UI Architecture:** Tailwind CSS + Framer Motion (Industrial Utilitarian design)
 
 ## 🔭 The Vision

@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import { GoogleGenerativeAI, GenerationConfig } from "@google/generative-ai";
 
 export interface AISummary {
     purpose: string;
@@ -7,18 +7,23 @@ export interface AISummary {
 }
 
 export class AIService {
-    private openai: OpenAI | null = null;
+    private genAI: GoogleGenerativeAI | null = null;
+    private model: any = null;
 
     constructor() {
-        if (process.env.AI_API_KEY) {
-            this.openai = new OpenAI({
-                apiKey: process.env.AI_API_KEY,
+        const apiKey = process.env.GEMINI_API_KEY;
+        const modelName = process.env.LLM_MODEL || "gemini-1.5-flash";
+
+        if (apiKey) {
+            this.genAI = new GoogleGenerativeAI(apiKey);
+            this.model = this.genAI.getGenerativeModel({
+                model: modelName,
             });
         }
     }
 
     public async summarizeFile(fileName: string, content: string): Promise<AISummary> {
-        if (this.openai) {
+        if (this.model) {
             return this.getRealSummary(fileName, content);
         }
         return this.getHeuristicMock(fileName, content);
@@ -26,29 +31,36 @@ export class AIService {
 
     private async getRealSummary(fileName: string, content: string): Promise<AISummary> {
         try {
-            const response = await this.openai!.chat.completions.create({
-                model: "gpt-4o-mini",
-                messages: [
-                    {
-                        role: "system",
-                        content: "You are a senior software architect. Analyze the provided code and summarize it concisely for an architectural diagram."
-                    },
-                    {
-                        role: "user",
-                        content: `Analyze this file: ${fileName}\n\nContent:\n${content.substring(0, 4000)}`
-                    }
-                ],
-                response_format: { type: "json_object" }
-            });
+            const prompt = `You are a senior software architect. Analyze the provided code and summarize it concisely for an architectural diagram.
+            
+            Analyze this file: ${fileName}
+            
+            Return ONLY a valid JSON object with the following structure:
+            {
+              "purpose": "A brief sentence on what this file does",
+              "responsibilities": ["list", "of", "core", "functions"],
+              "relationships": "How it interacts with other parts of the system"
+            }
+            
+            Content:
+            ${content.substring(0, 10000)}`;
 
-            const raw = JSON.parse(response.choices[0].message.content || "{}");
+            const result = await this.model.generateContent(prompt);
+            const response = await result.response;
+            const text = response.text();
+
+            // Extract JSON from potentially markdown-wrapped response
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            const cleanJson = jsonMatch ? jsonMatch[0] : "{}";
+
+            const raw = JSON.parse(cleanJson);
             return {
                 purpose: raw.purpose || "No purpose identified.",
                 responsibilities: raw.responsibilities || ["Analyzed logic flow"],
                 relationships: raw.relationships || "Internal module"
             };
         } catch (e) {
-            console.error("OpenAI Error:", e);
+            console.error("Gemini Error:", e);
             return this.getHeuristicMock(fileName, content);
         }
     }
