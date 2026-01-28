@@ -146,7 +146,7 @@ export function DocumentationPanel({ selectedFile, summaryData, isSummarizing, o
                                         <Layers className="h-3 w-3" /> Core Purpose
                                     </h3>
                                     <p className="text-sm leading-relaxed text-text-primary font-medium bg-white/5 p-4 rounded-lg border border-white/5 shadow-inner">
-                                        "{summaryData.purpose}"
+                                        &quot;{summaryData.purpose}&quot;
                                     </p>
                                 </section>
 

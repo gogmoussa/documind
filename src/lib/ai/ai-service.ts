@@ -94,6 +94,39 @@ export class AIService {
         // Simplified Mermaid generator for visualization
         return `graph TD\n  A[Entry] --> B[Logic]\n  B --> C[Output]`;
     }
+
+    public async chat(message: string, context: string): Promise<string> {
+        if (this.model) {
+            try {
+                const prompt = `You are DocuMind's AI Assistant, a helpful software architect living inside the codebase.
+                
+                Context about the current file/repo:
+                ${context.substring(0, 5000)}
+
+                User: ${message}
+                
+                Answer concisely and technically.`;
+
+                const result = await this.model.generateContent(prompt);
+                const response = await result.response;
+                return response.text();
+            } catch (e) {
+                console.error("Gemini Chat Error:", e);
+                return "I'm having trouble connecting to the neural core right now. (API Error)";
+            }
+        }
+
+        // Mock Fallback
+        return this.getMockChatResponse(message);
+    }
+
+    private getMockChatResponse(message: string): string {
+        const msg = message.toLowerCase();
+        if (msg.includes("hello") || msg.includes("hi")) return "System Online. I am DocuMind's architectural interface. How can I help you understand this codebase?";
+        if (msg.includes("repo") || msg.includes("code")) return "I am currently visualizing the dependency graph of your project. Select a file to see detailed insights.";
+        if (msg.includes("error")) return "No active system errors detected. The parser is operating at 100% efficiency.";
+        return "I am running in simulation mode (No API Key). I can help you navigate the UI, but I cannot analyze code deeply without a Neural Link.";
+    }
 }
 
 function extensionLabel(fileName: string) {

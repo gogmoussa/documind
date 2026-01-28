@@ -1,9 +1,12 @@
+"use client";
+
 import { Background, Controls, Panel, ReactFlow, useEdgesState, useNodesState, useReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Activity, Play } from "lucide-react";
+import { Activity } from "lucide-react";
 import { motion } from "framer-motion";
 import { useEffect } from "react";
 import { NodeData } from "@/types";
+import { AIAssistant } from "./AIAssistant";
 
 interface VisualMapProps {
     nodes: any[]; // React Flow nodes are complex to type strictly without dragging in generic hell, keeping any[] for flow nodes is often pragmatic but I'll try to be broader if I can.
@@ -121,19 +124,17 @@ export function VisualMap({
             )}
 
             {/* Status Status Bar Overlay */}
-            <div className="absolute bottom-8 left-8 flex gap-6 rounded-full border border-border-subtle bg-background-secondary/90 px-6 py-2 backdrop-blur-md z-10 shadow-xl">
+            <div className="absolute bottom-8 right-8 flex gap-6 rounded-full border border-border-subtle bg-background-secondary/90 px-6 py-2 backdrop-blur-md z-10 shadow-xl">
                 <div className="flex items-center gap-2">
                     <div className={`h-1.5 w-1.5 rounded-full ${nodes.length > 0 ? 'bg-accent-primary animate-pulse shadow-[0_0_10px_#00f2ff]' : 'bg-white/20'}`} />
                     <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">
                         {nodes.length > 0 ? 'Map Active' : 'Standby'}
                     </span>
                 </div>
-                <div className="w-px bg-white/10 h-3" />
-                <div className="flex items-center gap-2">
-                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
-                    <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">AI Core Online</span>
-                </div>
             </div>
+
+            {/* AI Assistant */}
+            <AIAssistant />
         </div>
     );
 }
