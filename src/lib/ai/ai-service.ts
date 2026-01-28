@@ -12,7 +12,7 @@ export class AIService {
 
     constructor() {
         const apiKey = process.env.GEMINI_API_KEY;
-        const modelName = process.env.LLM_MODEL || "gemini-1.5-flash";
+        const modelName = process.env.LLM_MODEL || "gemini-2.5-pro";
 
         if (apiKey) {
             this.genAI = new GoogleGenerativeAI(apiKey);

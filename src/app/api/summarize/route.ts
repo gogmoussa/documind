@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
         const summary = await aiService.summarizeFile(filePath, content);
         const diagram = await aiService.generateMermaid(content);
 
-        return NextResponse.json({ ...summary, diagram });
+        return NextResponse.json({ ...summary, diagram, content });
     } catch (error: any) {
         console.error("AI Error:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
