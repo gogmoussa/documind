@@ -4,6 +4,8 @@
 
 DocuMind is an AI-powered documentation agent designed to bridge the gap between complex source code and human-readable architectural maps. It uses **Static Analysis (ts-morph)** combined with **LLM Intelligence** to visually decompose your codebase into interactive, navigable blueprints.
 
+![alt text](.tmp/{95506AC4-12E2-4513-8750-A377A766EAA8}.png)
+
 ## 🚀 The DevRel "Wow" Factors
 - **Hierarchical Visualization:** Automatically groups modules into "Zonal Folders" to show project boundaries.
 - **Smart Connection Engine:** Detects both ES Modules (`import`) and CommonJS (`require`) dependencies.
