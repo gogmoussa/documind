@@ -143,26 +143,11 @@ export function VisualMap({
                                 <span className="w-2 h-2 rounded-full bg-accent-primary animate-pulse" />
                                 {nodes.length} Objects Live
                             </div>
-                            <div className="rounded border border-border-subtle bg-background-secondary/80 p-2 backdrop-blur-sm text-[8px] text-text-secondary uppercase font-bold flex flex-col gap-1.5 shadow-lg">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_5px_#ef4444]" />
-                                    <span>Critical Complexity (&gt;20)</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_5px_#eab308]" />
-                                    <span>High Complexity (&gt;10)</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_5px_#22c55e]" />
-                                    <span>Stable Logic</span>
-                                </div>
-                            </div>
                         </div>
                     </Panel>
 
                     <Panel position="bottom-center" className="mb-8">
                         <div className="flex flex-col items-center gap-2">
-                            <span className="text-[10px] text-text-secondary font-bold uppercase tracking-widest bg-background-primary/40 px-3 py-1 rounded-full border border-white/5 backdrop-blur-sm">Architectural Presets</span>
                             <div className="flex gap-2 p-1.5 bg-background-secondary/80 backdrop-blur-md rounded-2xl border border-border-subtle shadow-2xl">
                                 {[
                                     { id: 'TB-smoothstep', label: 'Hierarchy', icon: Layers, description: 'Standard Top-Down structural overview showing system layers.' },
@@ -196,15 +181,6 @@ export function VisualMap({
                         >
                             <Zap className="w-4 h-4 group-hover:rotate-12 transition-transform" /> Re-Layout Map
                         </button>
-
-                        <div className="flex gap-6 rounded-full border border-border-subtle bg-background-secondary/90 px-6 py-2.5 backdrop-blur-md shadow-xl">
-                            <div className="flex items-center gap-2">
-                                <div className={`h-2 w-2 rounded-full ${nodes.length > 0 ? 'bg-accent-primary animate-pulse shadow-[0_0_10px_#00f2ff]' : 'bg-white/20'}`} />
-                                <span className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em]">
-                                    {nodes.length > 0 ? 'System Active' : 'Standby'}
-                                </span>
-                            </div>
-                        </div>
                     </Panel>
                 </ReactFlow>
             ) : (

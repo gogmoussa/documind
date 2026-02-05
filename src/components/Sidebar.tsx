@@ -87,19 +87,7 @@ export function Sidebar({ nodes, onNodeClick, stats }: SidebarProps) {
                                 </div>
                             </div>
                         </motion.div>
-                    ) : (
-                        <motion.div
-                            key="pulse-header"
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="flex items-center justify-between"
-                        >
-                            <span className="text-[10px] text-accent-primary font-bold uppercase tracking-widest animate-pulse flex items-center gap-2">
-                                <ShieldCheck className="h-3 w-3" /> System Integrity: Stable
-                            </span>
-                        </motion.div>
-                    )}
+                    ) : (null)}
                 </AnimatePresence>
             </div>
 
@@ -216,10 +204,6 @@ export function Sidebar({ nodes, onNodeClick, stats }: SidebarProps) {
                         </motion.div>
                     )}
                 </AnimatePresence>
-            </div>
-
-            <div className="p-3 border-t border-border-subtle text-[9px] text-text-secondary text-center uppercase tracking-wider opacity-50 bg-background-primary/30">
-                System Ready
             </div>
         </aside>
     );
