@@ -1,4 +1,4 @@
-import { Activity, Cpu, Play, Search } from "lucide-react";
+import { Activity, Cpu, Play, Search, Menu } from "lucide-react";
 import { Dispatch, SetStateAction } from "react";
 
 interface HeaderProps {
@@ -6,18 +6,28 @@ interface HeaderProps {
     setRepoPath: Dispatch<SetStateAction<string>>;
     handleScan: () => void;
     isScanning: boolean;
+    toggleSidebar: () => void;
 }
 
-export function Header({ repoPath, setRepoPath, handleScan, isScanning }: HeaderProps) {
+export function Header({ repoPath, setRepoPath, handleScan, isScanning, toggleSidebar }: HeaderProps) {
     return (
         <header className="flex h-16 items-center justify-between border-b border-border-subtle bg-background-secondary/80 px-8 backdrop-blur-md z-10 select-none">
-            <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-accent-primary border border-accent-secondary border-glow shadow-[0_0_15px_rgba(0,242,255,0.3)]">
-                    <Cpu className="h-5 w-5 text-background-primary" />
-                </div>
-                <div className="flex flex-col">
-                    <h1 className="font-display text-xl font-bold tracking-tight text-glow uppercase leading-none">DOCUMIND</h1>
-                    <span className="text-[9px] text-accent-primary tracking-[0.2em] font-bold opacity-80">ARCHITECTURAL INTELLIGENCE</span>
+            <div className="flex items-center gap-6">
+                <button
+                    onClick={toggleSidebar}
+                    className="p-2 hover:bg-white/5 rounded-md text-text-secondary hover:text-accent-primary transition-all active:scale-90"
+                    title="Toggle Sidebar"
+                >
+                    <Menu className="h-5 w-5" />
+                </button>
+                <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-accent-primary border border-accent-secondary border-glow shadow-[0_0_15px_rgba(0,242,255,0.3)]">
+                        <Cpu className="h-5 w-5 text-background-primary" />
+                    </div>
+                    <div className="flex flex-col">
+                        <h1 className="font-display text-xl font-bold tracking-tight text-glow uppercase leading-none">DOCUMIND</h1>
+                        <span className="text-[9px] text-accent-primary tracking-[0.2em] font-bold opacity-80">ARCHITECTURAL INTELLIGENCE</span>
+                    </div>
                 </div>
             </div>
 

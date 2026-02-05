@@ -165,10 +165,10 @@ export function VisualMap({
                             <span className="text-[10px] text-text-secondary font-bold uppercase tracking-widest bg-background-primary/40 px-3 py-1 rounded-full border border-white/5 backdrop-blur-sm">Architectural Presets</span>
                             <div className="flex gap-2 p-1.5 bg-background-secondary/80 backdrop-blur-md rounded-2xl border border-border-subtle shadow-2xl">
                                 {[
-                                    { id: 'TB-smoothstep', label: 'Hierarchy', icon: Layers },
-                                    { id: 'LR-default', label: 'Stream', icon: Share2 },
-                                    { id: 'TB-straight', label: 'Blueprint', icon: Box },
-                                    { id: 'BT-step', label: 'Trace', icon: Activity }
+                                    { id: 'TB-smoothstep', label: 'Hierarchy', icon: Layers, description: 'Standard Top-Down structural overview showing system layers.' },
+                                    { id: 'LR-default', label: 'Stream', icon: Share2, description: 'Left-to-Right flow, ideal for sequential logic and pipelines.' },
+                                    { id: 'TB-straight', label: 'Blueprint', icon: Box, description: 'Clean orthogonal schematic layout for precise component mapping.' },
+                                    { id: 'BT-step', label: 'Trace', icon: Activity, description: 'Bottom-Up dependency tracing to find root base modules.' }
                                 ].map((p) => {
                                     const [dir, type] = p.id.split('-');
                                     const isActive = currentLayout?.direction === dir && currentLayout?.edgeType === type;
@@ -177,6 +177,7 @@ export function VisualMap({
                                         <button
                                             key={p.id}
                                             onClick={() => onLayoutChange?.({ direction: dir, edgeType: type })}
+                                            title={p.description}
                                             className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all border ${isActive ? 'bg-accent-primary border-accent-primary text-background-primary shadow-[0_0_20px_#00f2ff44]' : 'bg-white/5 border-transparent text-text-secondary hover:bg-white/10 hover:text-white'}`}
                                         >
                                             <Icon className="w-3 h-3" />

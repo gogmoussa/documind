@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
     ReactFlowProvider,
     useNodesState,
@@ -39,6 +39,7 @@ function DocuMindApp() {
     const [isSummarizing, setIsSummarizing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [layoutConfig, setLayoutConfig] = useState({ direction: 'TB', edgeType: 'smoothstep' });
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
     const applyLayout = useCallback((currentNodes: any[], currentEdges: any[], config: { direction: string, edgeType: string }) => {
         const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
@@ -200,10 +201,23 @@ function DocuMindApp() {
                 setRepoPath={setRepoPath}
                 handleScan={handleScan}
                 isScanning={isScanning}
+                toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
             />
 
             <div className="flex flex-1 overflow-hidden">
-                <Sidebar nodes={nodes} onNodeClick={onNodeClick} stats={repoStats} />
+                <AnimatePresence>
+                    {isSidebarOpen && (
+                        <motion.div
+                            initial={{ width: 0, opacity: 0 }}
+                            animate={{ width: "auto", opacity: 1 }}
+                            exit={{ width: 0, opacity: 0 }}
+                            transition={{ type: "spring", damping: 20, stiffness: 100 }}
+                            className="overflow-hidden flex"
+                        >
+                            <Sidebar nodes={nodes} onNodeClick={onNodeClick} stats={repoStats} />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 <div className="relative flex-1 bg-background-primary overflow-hidden h-full">
                     <VisualMap
