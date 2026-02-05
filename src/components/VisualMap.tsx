@@ -19,6 +19,7 @@ interface VisualMapProps {
     scanPercent: number;
     scanStep: string;
     error: string | null;
+    stats?: any;
 }
 
 const nodeTypes = {
@@ -34,7 +35,8 @@ export function VisualMap({
     isScanning,
     scanPercent,
     scanStep,
-    error
+    error,
+    stats
 }: VisualMapProps) {
     const { fitView } = useReactFlow();
     const [hoveredNode, setHoveredNode] = useState<string | null>(null);
@@ -215,7 +217,7 @@ export function VisualMap({
             </div>
 
             {/* AI Assistant */}
-            <AIAssistant />
+            <AIAssistant nodes={nodes} stats={stats} />
         </div>
     );
 }

@@ -30,9 +30,18 @@ export interface GraphEdge {
     target: string;
 }
 
+export interface RepositoryStats {
+    totalLoc: number;
+    totalFiles: number;
+    averageComplexity: number;
+    topComplexFiles: { name: string, score: number }[];
+    layerBreakdown: Record<string, number>;
+}
+
 export interface DependencyGraph {
     nodes: GraphNode[];
     edges: GraphEdge[];
+    stats: RepositoryStats;
 }
 
 export class CodeParser {
@@ -358,7 +367,26 @@ export class CodeParser {
             ))
         );
 
+        // --- Global Stats ---
+        const fileNodes = nodes.filter(n => n.type === 'file');
+        const stats: RepositoryStats = {
+            totalLoc: fileNodes.reduce((acc, n) => acc + (n.data?.loc || 0), 0),
+            totalFiles: fileNodes.length,
+            averageComplexity: fileNodes.length > 0
+                ? fileNodes.reduce((acc, n) => acc + (n.data?.complexity || 0), 0) / fileNodes.length
+                : 0,
+            topComplexFiles: fileNodes
+                .map(n => ({ id: n.id, name: n.label, score: n.data?.complexity || 0 }))
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 5),
+            layerBreakdown: fileNodes.reduce((acc, n) => {
+                const role = n.data?.architectureRole || "Unknown";
+                acc[role] = (acc[role] || 0) + 1;
+                return acc;
+            }, {} as Record<string, number>)
+        };
+
         console.log(`Generated ${uniqueEdges.length} edges.`);
-        return { nodes, edges: uniqueEdges };
+        return { nodes, edges: uniqueEdges, stats };
     }
 }

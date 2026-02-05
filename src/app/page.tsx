@@ -35,6 +35,7 @@ function DocuMindApp() {
     const [edges, setEdges, onEdgesChange] = useEdgesState<any>([]);
     const [selectedFile, setSelectedFile] = useState<any>(null);
     const [summaryData, setSummaryData] = useState<any>(null);
+    const [repoStats, setRepoStats] = useState<any>(null);
     const [isSummarizing, setIsSummarizing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -127,6 +128,7 @@ function DocuMindApp() {
 
                 setNodes(layoutedNodes);
                 setEdges(layoutedEdges);
+                setRepoStats(data.stats);
 
                 setTimeout(() => {
                     fitView({ padding: 0.2, duration: 1500 });
@@ -177,7 +179,7 @@ function DocuMindApp() {
             />
 
             <div className="flex flex-1 overflow-hidden">
-                <Sidebar nodes={nodes} onNodeClick={onNodeClick} />
+                <Sidebar nodes={nodes} onNodeClick={onNodeClick} stats={repoStats} />
 
                 <div className="relative flex-1 bg-background-primary overflow-hidden h-full">
                     <VisualMap
@@ -190,6 +192,7 @@ function DocuMindApp() {
                         scanPercent={scanPercent}
                         scanStep={scanStep}
                         error={error}
+                        stats={repoStats}
                     />
 
                     <AnimatePresence>

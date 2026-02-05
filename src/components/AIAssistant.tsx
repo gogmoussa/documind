@@ -10,7 +10,12 @@ interface Message {
     text: string;
 }
 
-export function AIAssistant() {
+interface AIAssistantProps {
+    nodes: any[];
+    stats: any;
+}
+
+export function AIAssistant({ nodes, stats }: AIAssistantProps) {
     const [mounted, setMounted] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
 
@@ -39,9 +44,18 @@ export function AIAssistant() {
         setIsTyping(true);
 
         try {
+            const context = {
+                fileCount: nodes.length,
+                stats: stats,
+                activeNodes: nodes.slice(0, 10).map(n => ({ id: n.id, role: n.data?.architectureRole })),
+            };
+
             const res = await fetch("/api/chat", {
                 method: "POST",
-                body: JSON.stringify({ message: userMsg.text, context: "Repository scan active." }), // Basic context for now
+                body: JSON.stringify({
+                    message: userMsg.text,
+                    context: `Current Repository Analysis: ${JSON.stringify(context)}`
+                }),
             });
             const data = await res.json();
 

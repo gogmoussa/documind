@@ -21,3 +21,11 @@ export interface SummaryData {
 }
 
 export interface NodeData extends FileData { }
+
+export interface RepositoryStats {
+    totalLoc: number;
+    totalFiles: number;
+    averageComplexity: number;
+    topComplexFiles: { id: string, name: string, score: number }[];
+    layerBreakdown: Record<string, number>;
+}
