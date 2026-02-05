@@ -71,10 +71,12 @@ function DocuMindApp() {
         setNodes([]);
         setEdges([]);
 
+        let progressInterval: ReturnType<typeof setInterval> | null = null;
+
         try {
             // Artificial progress steps for UX
             const progressRef = { current: 10 };
-            const interval = setInterval(() => {
+            progressInterval = setInterval(() => {
                 if (progressRef.current < 90) {
                     progressRef.current += Math.random() * 5;
                     setScanPercent(Math.floor(progressRef.current));
@@ -89,7 +91,6 @@ function DocuMindApp() {
             });
 
             const data = await response.json();
-            clearInterval(interval);
             setScanPercent(100);
 
             if (data.error) {
@@ -162,10 +163,13 @@ function DocuMindApp() {
             console.error("Scan failed:", error);
             setError(error.message || "An unexpected error occurred.");
         } finally {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+            }
             setTimeout(() => {
-                setIsScanning(false);
                 setScanPercent(0);
                 setScanStep("");
+                setIsScanning(false);
             }, 500);
         }
     };
