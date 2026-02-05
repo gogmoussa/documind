@@ -21,6 +21,7 @@ export interface GraphNode {
         complexity?: number;
         architectureRole?: string;
         designPatterns?: string[];
+        dependencyCount?: number;
     };
 }
 
@@ -117,6 +118,10 @@ export class CodeParser {
             let classes: string[] = [];
             let exportCount = 0;
             let loc = 0;
+            let color = '#3f3f46'; // Neutral default
+            let architectureRole: string | undefined = "Logic";
+            const designPatterns: string[] = [];
+            let dependencyCount = 0;
 
             try {
                 functions = sourceFile.getFunctions().map(f => f.getName()).filter(Boolean) as string[];
@@ -124,21 +129,43 @@ export class CodeParser {
                 const exports = sourceFile.getExportedDeclarations();
                 exportCount = exports.size;
                 loc = sourceFile.getEndLineNumber();
+
+                // Advanced Logic Role Inference
+                const importDeclarations = sourceFile.getImportDeclarations();
+                dependencyCount = importDeclarations.length;
+                const hasReact = content.includes("react") || content.includes("useState");
+                const isComponent = extension === '.tsx' || (hasReact && classes.length > 0);
+                const isService = filePath.includes(".service.") || filePath.includes("lib/");
+                const isRoute = filePath.includes("api/") || filePath.includes("route.");
+                const isTest = filePath.includes(".test.") || filePath.includes(".spec.");
+
+                if (isComponent) architectureRole = "Presentation";
+                else if (isRoute) architectureRole = "Edge/API";
+                else if (isService) architectureRole = "Service/Logic";
+                else if (isTest) architectureRole = "Verification";
+
+                // Design Pattern Heuristics
+                if (content.includes("new Proxy")) designPatterns.push("Proxy");
+                if (content.includes("EventEmitter")) designPatterns.push("Observer");
+                if (content.includes("Singleton") || (exportCount === 1 && classes.length === 1)) designPatterns.push("Singleton/Module");
+                if (content.includes("useContext")) designPatterns.push("Provider");
+
             } catch (e) {
-                // Fallback for non-TS files if we add them later via other means, though currently loop is over sourceFiles
                 loc = content.split('\n').length;
             }
 
-            let color = '#3f3f46'; // Neutral default
             if (extension === '.ts' || extension === '.tsx') color = '#2563eb'; // Blue
             if (extension === '.js' || extension === '.jsx') color = '#eab308'; // Yellow
-            if (content.includes("react") || content.includes("useState")) color = '#06b6d4'; // Cyan (React)
-            if (content.includes("express") || content.includes("NextResponse")) color = '#22c55e'; // Green (Server)
+
+            // Override colors based on roles for better "at-a-glance" value
+            if (architectureRole === 'Presentation') color = '#06b6d4'; // Cyan
+            if (architectureRole === 'Edge/API') color = '#22c55e'; // Green
+            if (architectureRole === 'Verification') color = '#ec4899'; // Pink
+            if (filePath.includes("config.") || filePath.includes(".json")) color = '#71717a';
 
             // --- Complexity Calculation ---
             let complexity = 0;
             try {
-                // Cyclomatic complexity proxy: count branching statements
                 const controlFlowKinds = [
                     SyntaxKind.IfStatement,
                     SyntaxKind.ForStatement,
@@ -147,8 +174,10 @@ export class CodeParser {
                     SyntaxKind.WhileStatement,
                     SyntaxKind.DoStatement,
                     SyntaxKind.CaseClause,
-                    SyntaxKind.ConditionalExpression, // ternary
-                    SyntaxKind.BinaryExpression, // &&, ||
+                    SyntaxKind.ConditionalExpression,
+                    SyntaxKind.BinaryExpression,
+                    SyntaxKind.TryStatement,
+                    SyntaxKind.CatchClause,
                 ];
 
                 sourceFile.forEachDescendant(node => {
@@ -164,8 +193,7 @@ export class CodeParser {
                         }
                     }
                 });
-                // Base complexity of 1 per function
-                complexity += functions.length;
+                complexity += (functions.length + classes.length);
             } catch (e) {
                 complexity = 0;
             }
@@ -184,23 +212,15 @@ export class CodeParser {
                     variables: [],
                     exportCount,
                     loc,
-                    complexity
+                    complexity,
+                    architectureRole,
+                    designPatterns,
+                    dependencyCount: dependencyCount || 0
                 }
             });
         }
 
-        // --- Python Support (Manual Scan) ---
-        // ts-morph doesn't do Python, so we scan manually
-        const pythonPatterns = [`${normalizedDir}/**/*.py`, `!${normalizedDir}/**/venv/**`];
-        // We need a globber, but for now let's just use readdir recursive or similar? 
-        // Or assume the user passed a path and we traverse.
-        // Actually, ts-morph addSourceFilesAtPaths handles globs for its own purposes. 
-        // We should probably just use fs traverse for everything if we want mixed language, 
-        // but mixing ts-morph and manual is fine.
-
-        // Let's do a quick manual glob for .py files since we can't depend on 'glob' package being installed
-        // We'll trust the user has typical structure.
-        // Implementing a simple recursive directory walker for .py
+        // --- Python Support (Enhanced Manual Scan) ---
         const getAllFiles = async (dir: string): Promise<string[]> => {
             let results: string[] = [];
             const list = await fs.readdir(dir);
@@ -221,31 +241,54 @@ export class CodeParser {
         };
 
         const pythonFiles = await getAllFiles(normalizedDir);
-        console.log(`Found ${pythonFiles.length} Python files.`);
-
         for (const pyFile of pythonFiles) {
             const content = await fs.readFile(pyFile, 'utf-8');
+            const lines = content.split('\n');
             const hash = crypto.createHash("md5").update(content).digest("hex");
 
-            // Simple Regex Analysis
-            const functions = (content.match(/^def\s+([a-zA-Z_][a-zA-Z0-9_]*)/gm) || []).map(m => m.replace(/^def\s+/, ''));
-            const classes = (content.match(/^class\s+([a-zA-Z_][a-zA-Z0-9_]*)/gm) || []).map(m => m.replace(/^class\s+/, ''));
+            // Python-specific Logic Analysis
+            const functions = (content.match(/^(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)/gm) || [])
+                .map(m => m.replace(/^(?:async\s+)?def\s+/, ''));
+            const classes = (content.match(/^class\s+([a-zA-Z_][a-zA-Z0-9_]*)/gm) || [])
+                .map(m => m.replace(/^class\s+/, ''));
+
+            // Complexity Heuristic for Python (Control Flow Count)
+            const controlKeywords = ['if ', 'elif ', 'for ', 'while ', 'except ', 'with ', 'match ', 'case '];
+            let complexity = functions.length + classes.length;
+            lines.forEach(line => {
+                const trimmed = line.trim();
+                controlKeywords.forEach(kw => {
+                    if (trimmed.startsWith(kw)) complexity++;
+                });
+            });
+
+            // Architecture Role Heuristic
+            let architectureRole = "Logic";
+            const designPatterns: string[] = [];
+
+            if (pyFile.includes("test_") || pyFile.includes("_test")) architectureRole = "Verification";
+            if (content.includes("FastAPI") || content.includes("Flask") || content.includes("Django")) architectureRole = "Edge/API";
+            if (content.includes("models.") || content.includes("Schema")) architectureRole = "Data/Model";
+            if (pyFile.endsWith("__init__.py")) architectureRole = "Orchestration";
+            if (content.includes("BaseSettings")) designPatterns.push("Configuration");
+            if (content.includes("abstractmethod")) designPatterns.push("Abstact Base Class");
 
             const relativeDir = path.relative(dirPath, path.dirname(pyFile)).replace(/\\/g, "/");
             const dirName = path.dirname(pyFile).replace(/\\/g, "/");
 
-            // Track folders for Python too
             if (relativeDir && relativeDir !== "." && !folderMap.has(dirName)) {
                 folderMap.add(dirName);
                 nodes.push({
-                    id: dirName,
-                    label: relativeDir,
-                    type: "folder",
-                    fileSize: 0,
-                    hash: "folder",
-                    color: "#242426"
+                    id: dirName, label: relativeDir, type: "folder", fileSize: 0, hash: "folder", color: "#242426"
                 });
             }
+
+            // Regex for imports
+            const importMatches = [
+                ...Array.from(content.matchAll(/^from\s+([\w\.]+)\s+import/gm)),
+                ...Array.from(content.matchAll(/^import\s+([\w\.]+)/gm))
+            ];
+            const dependencyCount = importMatches.length;
 
             nodes.push({
                 id: pyFile,
@@ -253,29 +296,29 @@ export class CodeParser {
                 type: "file",
                 fileSize: content.length,
                 hash: hash,
-                color: '#3b82f6', // Python Blue/Yellow usually, let's go Blueish
+                color: architectureRole === 'Verification' ? '#ec4899' : '#3b82f6',
                 parentId: relativeDir && relativeDir !== "." ? dirName : undefined,
                 data: {
                     functions,
                     classes,
                     variables: [],
-                    exportCount: functions.length + classes.length, // Rough proxy
-                    loc: content.split('\n').length
+                    exportCount: functions.length + classes.length,
+                    loc: lines.length,
+                    complexity,
+                    architectureRole,
+                    designPatterns,
+                    dependencyCount
                 }
             });
 
-            fileList.push(pyFile); // Add to lookup list
+            fileList.push(pyFile);
         }
 
         // --- Edge Detection ---
         for (const sourceFile of sourceFiles) {
             const filePath = sourceFile.getFilePath().replace(/\\/g, "/");
-
-            // Helper: Detect fuzzy edges
             const addEdgeTo = (specifier: string) => {
-                // Ignore node_modules
                 if (!specifier.startsWith(".")) return;
-
                 const dir = path.dirname(filePath);
                 const candidates = [
                     path.resolve(dir, specifier).replace(/\\/g, "/"),
@@ -286,37 +329,22 @@ export class CodeParser {
                     path.resolve(dir, specifier, "index.ts").replace(/\\/g, "/"),
                     path.resolve(dir, specifier, "index.js").replace(/\\/g, "/"),
                 ];
-
                 const target = fileList.find(f => candidates.includes(f));
                 if (target && target !== filePath) {
-                    edges.push({
-                        id: `e-${crypto.randomBytes(4).toString('hex')}`,
-                        source: filePath,
-                        target: target
-                    });
+                    edges.push({ id: `e-${crypto.randomBytes(4).toString('hex')}`, source: filePath, target: target });
                 }
             };
 
-            // 1. Static Imports (ESM)
-            sourceFile.getImportDeclarations().forEach(imp => {
-                addEdgeTo(imp.getModuleSpecifierValue());
-            });
-
-            // 2. Export Declarations (Re-exports)
+            sourceFile.getImportDeclarations().forEach(imp => addEdgeTo(imp.getModuleSpecifierValue()));
             sourceFile.getExportDeclarations().forEach(exp => {
-                const moduleSpecifier = exp.getModuleSpecifierValue();
-                if (moduleSpecifier) {
-                    addEdgeTo(moduleSpecifier);
-                }
+                const ms = exp.getModuleSpecifierValue();
+                if (ms) addEdgeTo(ms);
             });
 
-            // 3. Dynamic Imports & Requires
             sourceFile.forEachDescendant(node => {
                 if (node.getKind() === SyntaxKind.CallExpression) {
                     const callExpr = node as any;
-                    const expression = callExpr.getExpression();
-                    const text = expression.getText();
-
+                    const text = callExpr.getExpression().getText();
                     if (text === "require" || text === "import") {
                         const args = callExpr.getArguments();
                         if (args.length > 0 && args[0].getKind() === SyntaxKind.StringLiteral) {

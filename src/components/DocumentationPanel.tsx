@@ -121,8 +121,8 @@ export function DocumentationPanel({ selectedFile, summaryData, isSummarizing, o
                                             </h3>
                                             {selectedFile.data.complexity !== undefined && (
                                                 <div className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${selectedFile.data.complexity > 20 ? 'bg-red-500/10 text-red-500 border border-red-500/20' :
-                                                        selectedFile.data.complexity > 10 ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' :
-                                                            'bg-green-500/10 text-green-500 border border-green-500/20'
+                                                    selectedFile.data.complexity > 10 ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' :
+                                                        'bg-green-500/10 text-green-500 border border-green-500/20'
                                                     }`}>
                                                     <Zap className="h-3 w-3" /> Complexity: {selectedFile.data.complexity}
                                                 </div>
@@ -144,6 +144,10 @@ export function DocumentationPanel({ selectedFile, summaryData, isSummarizing, o
                                             <div className="flex flex-col opacity-70">
                                                 <span className="text-text-secondary text-[10px]">Classes</span>
                                                 <span className="font-mono text-text-primary">{selectedFile.data.classes?.length || 0}</span>
+                                            </div>
+                                            <div className="flex flex-col opacity-70">
+                                                <span className="text-text-secondary text-[10px]">Coupling</span>
+                                                <span className="font-mono text-text-primary">{selectedFile.data.dependencyCount || 0} imports</span>
                                             </div>
                                         </div>
                                     </section>
