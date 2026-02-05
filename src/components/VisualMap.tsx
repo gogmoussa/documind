@@ -1,8 +1,8 @@
 "use client";
 
-import { Background, Controls, Panel, ReactFlow, useEdgesState, useNodesState, useReactFlow, Node, Edge } from "@xyflow/react";
+import { Background, Controls, Panel, ReactFlow, useEdgesState, useNodesState, useReactFlow, Node, Edge, MiniMap } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Activity } from "lucide-react";
+import { Activity, Layers, Share2, Box, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { NodeData } from "@/types";
@@ -20,6 +20,8 @@ interface VisualMapProps {
     scanStep: string;
     error: string | null;
     stats?: any;
+    onLayoutChange?: (options: { direction: string, edgeType: string }) => void;
+    currentLayout?: { direction: string, edgeType: string };
 }
 
 const nodeTypes = {
@@ -36,21 +38,22 @@ export function VisualMap({
     scanPercent,
     scanStep,
     error,
-    stats
+    stats,
+    onLayoutChange,
+    currentLayout
 }: VisualMapProps) {
     const { fitView } = useReactFlow();
     const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
-    // Blast Radius Logic: Calculate which nodes/edges are in the impact zone
+    // Blast Radius Logic
     const impactElements = useMemo(() => {
         if (!hoveredNode) return { nodes: new Set(), edges: new Set() };
 
         const connectedNodes = new Set([hoveredNode]);
         const connectedEdges = new Set();
 
-        // Find all downstream paths (recursive for better architect insight)
         const findDownstream = (id: string, depth = 0) => {
-            if (depth > 5) return; // Prevent infinite loops just in case
+            if (depth > 5) return;
             edges.forEach(edge => {
                 if (edge.source === id) {
                     connectedNodes.add(edge.target);
@@ -60,7 +63,6 @@ export function VisualMap({
             });
         };
 
-        // Find all immediate upstream (who depends on me)
         edges.forEach(edge => {
             if (edge.target === hoveredNode) {
                 connectedNodes.add(edge.source);
@@ -72,7 +74,6 @@ export function VisualMap({
         return { nodes: connectedNodes, edges: connectedEdges };
     }, [hoveredNode, edges]);
 
-    // Apply styles dynamically based on impact
     const styledNodes = useMemo(() =>
         nodes.map(node => ({
             ...node,
@@ -94,7 +95,6 @@ export function VisualMap({
             }
         })), [edges, hoveredNode, impactElements]);
 
-    // Auto-fit when nodes change significantly
     useEffect(() => {
         if (nodes.length > 0 && !isScanning) {
             setTimeout(() => fitView({ padding: 0.1, duration: 800 }), 100);
@@ -121,9 +121,23 @@ export function VisualMap({
                     maxZoom={2}
                     className="bg-background-primary transition-all"
                 >
-                    <Background color="#242426" gap={32} size={1} />
-                    <Controls className="bg-background-secondary border-border-subtle fill-text-primary" />
-                    <Panel position="top-right">
+                    <Background color="#1a1a1c" gap={40} size={1} />
+
+                    <Controls
+                        position="top-left"
+                        className="bg-background-secondary border-border-subtle fill-text-primary !shadow-2xl m-4"
+                    />
+
+                    <MiniMap
+                        position="bottom-left"
+                        nodeStrokeColor="#00f2ff"
+                        nodeColor={(n) => (n.type === 'architectureNode' ? '#141416' : '#27272a')}
+                        maskColor="rgba(0, 0, 0, 0.4)"
+                        style={{ backgroundColor: '#09090b', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', margin: '16px' }}
+                        className="!bg-background-secondary/50 !backdrop-blur-md"
+                    />
+
+                    <Panel position="top-right" className="m-4">
                         <div className="flex flex-col gap-2">
                             <div className="rounded border border-border-subtle bg-background-secondary/80 p-2 backdrop-blur-sm text-[10px] text-text-secondary uppercase font-bold flex items-center gap-2 shadow-lg">
                                 <span className="w-2 h-2 rounded-full bg-accent-primary animate-pulse" />
@@ -145,12 +159,56 @@ export function VisualMap({
                             </div>
                         </div>
                     </Panel>
+
+                    <Panel position="bottom-center" className="mb-8">
+                        <div className="flex flex-col items-center gap-2">
+                            <span className="text-[10px] text-text-secondary font-bold uppercase tracking-widest bg-background-primary/40 px-3 py-1 rounded-full border border-white/5 backdrop-blur-sm">Architectural Presets</span>
+                            <div className="flex gap-2 p-1.5 bg-background-secondary/80 backdrop-blur-md rounded-2xl border border-border-subtle shadow-2xl">
+                                {[
+                                    { id: 'TB-smoothstep', label: 'Hierarchy', icon: Layers },
+                                    { id: 'LR-default', label: 'Stream', icon: Share2 },
+                                    { id: 'TB-straight', label: 'Blueprint', icon: Box },
+                                    { id: 'BT-step', label: 'Trace', icon: Activity }
+                                ].map((p) => {
+                                    const [dir, type] = p.id.split('-');
+                                    const isActive = currentLayout?.direction === dir && currentLayout?.edgeType === type;
+                                    const Icon = p.icon;
+                                    return (
+                                        <button
+                                            key={p.id}
+                                            onClick={() => onLayoutChange?.({ direction: dir, edgeType: type })}
+                                            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all border ${isActive ? 'bg-accent-primary border-accent-primary text-background-primary shadow-[0_0_20px_#00f2ff44]' : 'bg-white/5 border-transparent text-text-secondary hover:bg-white/10 hover:text-white'}`}
+                                        >
+                                            <Icon className="w-3 h-3" />
+                                            <span className="text-[10px] font-bold uppercase tracking-wider">{p.label}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </Panel>
+
+                    <Panel position="bottom-right" className="m-8 flex flex-col items-end gap-4">
+                        <button
+                            onClick={() => onLayoutChange?.(currentLayout || { direction: 'TB', edgeType: 'smoothstep' })}
+                            className="flex items-center gap-3 px-4 py-2.5 bg-accent-primary/10 hover:bg-accent-primary/20 backdrop-blur-md border border-accent-primary/30 rounded-full text-[11px] font-bold text-accent-primary transition-all hover:shadow-[0_0_20px_#00f2ff33] group"
+                        >
+                            <Zap className="w-4 h-4 group-hover:rotate-12 transition-transform" /> Re-Layout Map
+                        </button>
+
+                        <div className="flex gap-6 rounded-full border border-border-subtle bg-background-secondary/90 px-6 py-2.5 backdrop-blur-md shadow-xl">
+                            <div className="flex items-center gap-2">
+                                <div className={`h-2 w-2 rounded-full ${nodes.length > 0 ? 'bg-accent-primary animate-pulse shadow-[0_0_10px_#00f2ff]' : 'bg-white/20'}`} />
+                                <span className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.15em]">
+                                    {nodes.length > 0 ? 'System Active' : 'Standby'}
+                                </span>
+                            </div>
+                        </div>
+                    </Panel>
                 </ReactFlow>
             ) : (
                 <div className="flex h-full items-center justify-center p-12 relative">
-                    {/* Background Grid Accent */}
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-accent-primary/5 to-transparent pointer-events-none" />
-
                     <div className="text-center w-full max-w-md relative z-10">
                         {isScanning ? (
                             <div className="space-y-8">
@@ -165,7 +223,6 @@ export function VisualMap({
                                         transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
                                         className="absolute inset-4 rounded-full border-t-2 border-accent-primary shadow-[0_0_15px_#00f2ff]"
                                     />
-
                                     <div className="absolute inset-0 flex items-center justify-center flex-col">
                                         <span className="text-3xl font-bold font-display text-accent-primary tracking-tighter">{scanPercent}%</span>
                                     </div>
@@ -191,7 +248,6 @@ export function VisualMap({
                                 <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/5 border border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
                                     <Activity className={`h-8 w-8 ${error ? "text-red-500" : "text-text-secondary"}`} />
                                 </div>
-
                                 <div className="space-y-2">
                                     <h3 className={`font-display text-xl font-bold uppercase tracking-widest ${error ? "text-red-500" : "text-text-primary"}`}>
                                         {error ? "System Error" : "System Idle"}
@@ -205,18 +261,6 @@ export function VisualMap({
                     </div>
                 </div>
             )}
-
-            {/* Status Status Bar Overlay */}
-            <div className="absolute bottom-8 right-8 flex gap-6 rounded-full border border-border-subtle bg-background-secondary/90 px-6 py-2 backdrop-blur-md z-10 shadow-xl">
-                <div className="flex items-center gap-2">
-                    <div className={`h-1.5 w-1.5 rounded-full ${nodes.length > 0 ? 'bg-accent-primary animate-pulse shadow-[0_0_10px_#00f2ff]' : 'bg-white/20'}`} />
-                    <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">
-                        {nodes.length > 0 ? 'Map Active' : 'Standby'}
-                    </span>
-                </div>
-            </div>
-
-            {/* AI Assistant */}
             <AIAssistant nodes={nodes} stats={stats} />
         </div>
     );

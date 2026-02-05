@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { AnimatePresence } from "framer-motion";
 import {
     ReactFlowProvider,
@@ -38,6 +38,27 @@ function DocuMindApp() {
     const [repoStats, setRepoStats] = useState<any>(null);
     const [isSummarizing, setIsSummarizing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [layoutConfig, setLayoutConfig] = useState({ direction: 'TB', edgeType: 'smoothstep' });
+
+    const applyLayout = useCallback((currentNodes: any[], currentEdges: any[], config: { direction: string, edgeType: string }) => {
+        const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+            currentNodes.filter((n: any) => n.id !== 'DUMMY_GROUP'),
+            currentEdges.map(e => ({ ...e, type: config.edgeType })),
+            { direction: config.direction, ranksep: 120, nodesep: 80 }
+        );
+        return { layoutedNodes, layoutedEdges };
+    }, []);
+
+    const onLayoutChange = useCallback((newConfig: { direction: string, edgeType: string }) => {
+        setLayoutConfig(newConfig);
+        const { layoutedNodes, layoutedEdges } = applyLayout(nodes, edges, newConfig);
+        setNodes(layoutedNodes);
+        setEdges(layoutedEdges);
+
+        setTimeout(() => {
+            fitView({ padding: 0.1, duration: 800 });
+        }, 50);
+    }, [nodes, edges, applyLayout, fitView, setNodes, setEdges]);
 
     const handleScan = async () => {
         if (!repoPath) return;
@@ -117,10 +138,10 @@ function DocuMindApp() {
                 }));
 
                 // Apply Dagre Layout
-                const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
-                    rawNodes.filter((n: any) => n.type !== 'group'), // Only layout files for now to keep it simple, or we can look into compound layout later
+                const { layoutedNodes, layoutedEdges } = applyLayout(
+                    rawNodes.filter((n: any) => n.type !== 'group'),
                     formatEdges,
-                    'TB' // Top to Bottom flow
+                    layoutConfig
                 );
 
                 // Add folders back if we want, or just hide them for the graph view vs file view
@@ -193,6 +214,8 @@ function DocuMindApp() {
                         scanStep={scanStep}
                         error={error}
                         stats={repoStats}
+                        onLayoutChange={onLayoutChange}
+                        currentLayout={layoutConfig}
                     />
 
                     <AnimatePresence>
