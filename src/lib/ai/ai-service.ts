@@ -13,6 +13,7 @@ export class AIService {
     private genAI: GoogleGenerativeAI | null = null;
     private model: any = null;
     private static cache: Map<string, AISummary> = new Map();
+    private static readonly cacheMaxEntries = 200;
 
     constructor() {
         const apiKey = process.env.GEMINI_API_KEY;
@@ -27,9 +28,12 @@ export class AIService {
     }
 
     public async summarizeFile(fileName: string, content: string, hash?: string): Promise<AISummary> {
-        if (hash && AIService.cache.has(hash)) {
-            console.log(`Cache Hit for ${fileName}`);
-            return AIService.cache.get(hash)!;
+        if (hash) {
+            const cached = AIService.getFromCache(hash);
+            if (cached) {
+                console.log(`Cache Hit for ${fileName}`);
+                return cached;
+            }
         }
 
         let summary: AISummary;
@@ -40,7 +44,7 @@ export class AIService {
         }
 
         if (hash) {
-            AIService.cache.set(hash, summary);
+            AIService.setCache(hash, summary);
         }
         return summary;
     }
@@ -155,6 +159,29 @@ export class AIService {
         if (msg.includes("repo") || msg.includes("code")) return "I am currently visualizing the dependency graph of your project. Select a file to see detailed insights.";
         if (msg.includes("error")) return "No active system errors detected. The parser is operating at 100% efficiency.";
         return "I am running in simulation mode (No API Key). I can help you navigate the UI, but I cannot analyze code deeply without a Neural Link.";
+    }
+
+    private static getFromCache(hash: string): AISummary | undefined {
+        const value = AIService.cache.get(hash);
+        if (!value) {
+            return undefined;
+        }
+        AIService.cache.delete(hash);
+        AIService.cache.set(hash, value);
+        return value;
+    }
+
+    private static setCache(hash: string, summary: AISummary): void {
+        if (AIService.cache.has(hash)) {
+            AIService.cache.delete(hash);
+        }
+        AIService.cache.set(hash, summary);
+        if (AIService.cache.size > AIService.cacheMaxEntries) {
+            const oldestKey = AIService.cache.keys().next().value;
+            if (oldestKey) {
+                AIService.cache.delete(oldestKey);
+            }
+        }
     }
 }
 
