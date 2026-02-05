@@ -17,7 +17,7 @@ export function Sidebar({ nodes, onNodeClick, stats }: SidebarProps) {
     const [groupByType, setGroupByType] = useState(false);
 
     const processedFiles = useMemo(() => {
-        let files = nodes.filter(n => n.type === 'file' || n.type === 'group' || !n.type);
+        let files = nodes.filter(n => n.type === 'file' || n.type === 'group' || n.type === 'architectureNode' || !n.type);
 
         // Sorting Logic
         files.sort((a, b) => {
