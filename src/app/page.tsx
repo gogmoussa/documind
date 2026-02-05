@@ -179,7 +179,10 @@ function DocuMindApp() {
         try {
             const response = await fetch("/api/summarize", {
                 method: "POST",
-                body: JSON.stringify({ filePath: node.id }),
+                body: JSON.stringify({
+                    filePath: node.id,
+                    hash: node.data.hash
+                }),
             });
             const data = await response.json();
             setSummaryData(data);

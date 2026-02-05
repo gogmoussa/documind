@@ -4,7 +4,7 @@ import fs from "fs/promises";
 
 export async function POST(req: NextRequest) {
     try {
-        const { filePath } = await req.json();
+        const { filePath, hash } = await req.json();
 
         if (!filePath) {
             return NextResponse.json({ error: "No file path provided" }, { status: 400 });
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
         const content = await fs.readFile(filePath, "utf-8");
 
         const aiService = new AIService();
-        const summary = await aiService.summarizeFile(filePath, content);
+        const summary = await aiService.summarizeFile(filePath, content, hash);
         const diagram = await aiService.generateMermaid(content);
 
         return NextResponse.json({ ...summary, diagram, content });

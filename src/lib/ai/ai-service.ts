@@ -12,6 +12,7 @@ export interface AISummary {
 export class AIService {
     private genAI: GoogleGenerativeAI | null = null;
     private model: any = null;
+    private static cache: Map<string, AISummary> = new Map();
 
     constructor() {
         const apiKey = process.env.GEMINI_API_KEY;
@@ -25,11 +26,23 @@ export class AIService {
         }
     }
 
-    public async summarizeFile(fileName: string, content: string): Promise<AISummary> {
-        if (this.model) {
-            return this.getRealSummary(fileName, content);
+    public async summarizeFile(fileName: string, content: string, hash?: string): Promise<AISummary> {
+        if (hash && AIService.cache.has(hash)) {
+            console.log(`Cache Hit for ${fileName}`);
+            return AIService.cache.get(hash)!;
         }
-        return this.getHeuristicMock(fileName, content);
+
+        let summary: AISummary;
+        if (this.model) {
+            summary = await this.getRealSummary(fileName, content);
+        } else {
+            summary = this.getHeuristicMock(fileName, content);
+        }
+
+        if (hash) {
+            AIService.cache.set(hash, summary);
+        }
+        return summary;
     }
 
     private async getRealSummary(fileName: string, content: string): Promise<AISummary> {
