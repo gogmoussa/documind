@@ -1,15 +1,16 @@
 "use client";
 
-import { Background, Controls, Panel, ReactFlow, useEdgesState, useNodesState, useReactFlow } from "@xyflow/react";
+import { Background, Controls, Panel, ReactFlow, useEdgesState, useNodesState, useReactFlow, Node, Edge } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Activity } from "lucide-react";
 import { motion } from "framer-motion";
-import { useEffect } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { NodeData } from "@/types";
 import { AIAssistant } from "./AIAssistant";
+import { ArchitectureNode } from "./ArchitectureNode";
 
 interface VisualMapProps {
-    nodes: any[]; // React Flow nodes are complex to type strictly without dragging in generic hell, keeping any[] for flow nodes is often pragmatic but I'll try to be broader if I can.
+    nodes: any[];
     edges: any[];
     onNodesChange: any;
     onEdgesChange: any;
@@ -19,6 +20,10 @@ interface VisualMapProps {
     scanStep: string;
     error: string | null;
 }
+
+const nodeTypes = {
+    architectureNode: ArchitectureNode,
+};
 
 export function VisualMap({
     nodes,
@@ -32,34 +37,110 @@ export function VisualMap({
     error
 }: VisualMapProps) {
     const { fitView } = useReactFlow();
+    const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
-    // Auto-fit when nodes change significantly (e.g. after scan)
+    // Blast Radius Logic: Calculate which nodes/edges are in the impact zone
+    const impactElements = useMemo(() => {
+        if (!hoveredNode) return { nodes: new Set(), edges: new Set() };
+
+        const connectedNodes = new Set([hoveredNode]);
+        const connectedEdges = new Set();
+
+        // Find all downstream paths (recursive for better architect insight)
+        const findDownstream = (id: string, depth = 0) => {
+            if (depth > 5) return; // Prevent infinite loops just in case
+            edges.forEach(edge => {
+                if (edge.source === id) {
+                    connectedNodes.add(edge.target);
+                    connectedEdges.add(edge.id);
+                    findDownstream(edge.target, depth + 1);
+                }
+            });
+        };
+
+        // Find all immediate upstream (who depends on me)
+        edges.forEach(edge => {
+            if (edge.target === hoveredNode) {
+                connectedNodes.add(edge.source);
+                connectedEdges.add(edge.id);
+            }
+        });
+
+        findDownstream(hoveredNode);
+        return { nodes: connectedNodes, edges: connectedEdges };
+    }, [hoveredNode, edges]);
+
+    // Apply styles dynamically based on impact
+    const styledNodes = useMemo(() =>
+        nodes.map(node => ({
+            ...node,
+            style: {
+                ...node.style,
+                opacity: hoveredNode ? (impactElements.nodes.has(node.id) ? 1 : 0.15) : 1,
+            }
+        })), [nodes, hoveredNode, impactElements]);
+
+    const styledEdges = useMemo(() =>
+        edges.map(edge => ({
+            ...edge,
+            animated: hoveredNode ? impactElements.edges.has(edge.id) : edge.animated,
+            style: {
+                ...edge.style,
+                stroke: hoveredNode ? (impactElements.edges.has(edge.id) ? '#00f2ff' : '#27272a') : '#52525b',
+                strokeWidth: hoveredNode ? (impactElements.edges.has(edge.id) ? 3 : 1) : 1.5,
+                opacity: hoveredNode ? (impactElements.edges.has(edge.id) ? 1 : 0.05) : 0.6,
+            }
+        })), [edges, hoveredNode, impactElements]);
+
+    // Auto-fit when nodes change significantly
     useEffect(() => {
         if (nodes.length > 0 && !isScanning) {
             setTimeout(() => fitView({ padding: 0.1, duration: 800 }), 100);
         }
     }, [nodes.length, isScanning, fitView]);
 
+    const onNodeMouseEnter = useCallback((_e: any, node: any) => setHoveredNode(node.id), []);
+    const onNodeMouseLeave = useCallback(() => setHoveredNode(null), []);
+
     return (
         <div className="relative flex-1 bg-background-primary overflow-hidden h-full">
             {nodes.length > 0 && !isScanning ? (
                 <ReactFlow
-                    nodes={nodes}
-                    edges={edges}
+                    nodes={styledNodes}
+                    edges={styledEdges}
                     onNodesChange={onNodesChange}
                     onEdgesChange={onEdgesChange}
                     onNodeClick={onNodeClick}
+                    onNodeMouseEnter={onNodeMouseEnter}
+                    onNodeMouseLeave={onNodeMouseLeave}
+                    nodeTypes={nodeTypes}
                     fitView
-                    minZoom={0.1}
-                    maxZoom={4}
-                    className="bg-background-primary"
+                    minZoom={0.05}
+                    maxZoom={2}
+                    className="bg-background-primary transition-all"
                 >
                     <Background color="#242426" gap={32} size={1} />
                     <Controls className="bg-background-secondary border-border-subtle fill-text-primary" />
                     <Panel position="top-right">
-                        <div className="rounded border border-border-subtle bg-background-secondary/80 p-2 backdrop-blur-sm text-[10px] text-text-secondary uppercase font-bold flex items-center gap-2 shadow-lg">
-                            <span className="w-2 h-2 rounded-full bg-accent-primary animate-pulse" />
-                            {nodes.length} Objects Live
+                        <div className="flex flex-col gap-2">
+                            <div className="rounded border border-border-subtle bg-background-secondary/80 p-2 backdrop-blur-sm text-[10px] text-text-secondary uppercase font-bold flex items-center gap-2 shadow-lg">
+                                <span className="w-2 h-2 rounded-full bg-accent-primary animate-pulse" />
+                                {nodes.length} Objects Live
+                            </div>
+                            <div className="rounded border border-border-subtle bg-background-secondary/80 p-2 backdrop-blur-sm text-[8px] text-text-secondary uppercase font-bold flex flex-col gap-1.5 shadow-lg">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_5px_#ef4444]" />
+                                    <span>Critical Complexity (&gt;20)</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_5px_#eab308]" />
+                                    <span>High Complexity (&gt;10)</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_5px_#22c55e]" />
+                                    <span>Stable Logic</span>
+                                </div>
+                            </div>
                         </div>
                     </Panel>
                 </ReactFlow>

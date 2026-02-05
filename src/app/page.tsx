@@ -79,7 +79,7 @@ function DocuMindApp() {
 
                 const rawNodes = data.nodes.map((n: any) => ({
                     id: n.id,
-                    type: n.type === 'folder' ? 'group' : undefined,
+                    type: n.type === 'folder' ? 'group' : 'architectureNode',
                     data: { label: n.label, ...n, ...n.data },
                     position: { x: 0, y: 0 }, // Initial position, will be set by dagre
                     style: n.type === 'folder'
