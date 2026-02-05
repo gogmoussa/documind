@@ -41,12 +41,6 @@ function DocuMindApp() {
     const handleScan = async () => {
         if (!repoPath) return;
 
-        // Block URLs
-        if (repoPath.startsWith("http")) {
-            setError("DocuMind requires a LOCAL directory path (e.g., C:\\Projects\\my-app). URL-based scanning is not supported yet.");
-            return;
-        }
-
         setIsScanning(true);
         setError(null);
         setScanPercent(10);
