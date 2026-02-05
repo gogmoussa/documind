@@ -28,7 +28,7 @@ export function Header({ repoPath, setRepoPath, handleScan, isScanning }: Header
                         type="text"
                         value={repoPath}
                         onChange={(e) => setRepoPath(e.target.value)}
-                        placeholder="Absolute LOCAL path (e.g. C:\Projects\repo)..."
+                        placeholder="Local path or Git URL (e.g. C:\Projects\repo or https://github.com/user/repo)..."
                         className="bg-transparent text-sm outline-none placeholder:text-text-secondary/50 w-full text-text-primary font-mono"
                     />
                 </div>
