@@ -12,7 +12,16 @@ export interface GraphNode {
     summary?: string;
     parentId?: string;
     color?: string;
-    data?: any;
+    data?: {
+        functions: string[];
+        classes: string[];
+        variables: string[];
+        exportCount: number;
+        loc: number;
+        complexity?: number;
+        architectureRole?: string;
+        designPatterns?: string[];
+    };
 }
 
 export interface GraphEdge {
@@ -117,6 +126,41 @@ export class CodeParser {
             if (content.includes("react") || content.includes("useState")) color = '#06b6d4'; // Cyan (React)
             if (content.includes("express") || content.includes("NextResponse")) color = '#22c55e'; // Green (Server)
 
+            // --- Complexity Calculation ---
+            let complexity = 0;
+            try {
+                // Cyclomatic complexity proxy: count branching statements
+                const controlFlowKinds = [
+                    SyntaxKind.IfStatement,
+                    SyntaxKind.ForStatement,
+                    SyntaxKind.ForInStatement,
+                    SyntaxKind.ForOfStatement,
+                    SyntaxKind.WhileStatement,
+                    SyntaxKind.DoStatement,
+                    SyntaxKind.CaseClause,
+                    SyntaxKind.ConditionalExpression, // ternary
+                    SyntaxKind.BinaryExpression, // &&, ||
+                ];
+
+                sourceFile.forEachDescendant(node => {
+                    const kind = node.getKind();
+                    if (controlFlowKinds.includes(kind)) {
+                        if (kind === SyntaxKind.BinaryExpression) {
+                            const op = (node as any).getOperatorToken().getKind();
+                            if (op === SyntaxKind.AmpersandAmpersandToken || op === SyntaxKind.BarBarToken) {
+                                complexity++;
+                            }
+                        } else {
+                            complexity++;
+                        }
+                    }
+                });
+                // Base complexity of 1 per function
+                complexity += functions.length;
+            } catch (e) {
+                complexity = 0;
+            }
+
             nodes.push({
                 id: filePath,
                 label: path.basename(filePath),
@@ -130,7 +174,8 @@ export class CodeParser {
                     classes,
                     variables: [],
                     exportCount,
-                    loc
+                    loc,
+                    complexity
                 }
             });
         }

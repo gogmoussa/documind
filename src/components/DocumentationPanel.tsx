@@ -1,4 +1,4 @@
-import { Activity, Code, FileText, Layers, X, Copy, Check, GitBranch } from "lucide-react";
+import { Activity, Code, FileText, Layers, X, Copy, Check, GitBranch, Zap, ShieldCheck, Box } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import mermaid from "mermaid";
@@ -115,9 +115,19 @@ export function DocumentationPanel({ selectedFile, summaryData, isSummarizing, o
                                 {/* Auto-detected Metrics */}
                                 {selectedFile.data && (
                                     <section className="bg-background-secondary/50 p-4 rounded-lg border border-border-subtle mb-4">
-                                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-secondary mb-3 flex items-center gap-2">
-                                            <Code className="h-3 w-3" /> Static Analysis
-                                        </h3>
+                                        <div className="flex justify-between items-start mb-3">
+                                            <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-secondary flex items-center gap-2">
+                                                <Code className="h-3 w-3" /> Static Analysis
+                                            </h3>
+                                            {selectedFile.data.complexity !== undefined && (
+                                                <div className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${selectedFile.data.complexity > 20 ? 'bg-red-500/10 text-red-500 border border-red-500/20' :
+                                                        selectedFile.data.complexity > 10 ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' :
+                                                            'bg-green-500/10 text-green-500 border border-green-500/20'
+                                                    }`}>
+                                                    <Zap className="h-3 w-3" /> Complexity: {selectedFile.data.complexity}
+                                                </div>
+                                            )}
+                                        </div>
                                         <div className="grid grid-cols-2 gap-2 text-xs">
                                             <div className="flex flex-col">
                                                 <span className="text-text-secondary text-[10px]">LOC</span>
@@ -139,16 +149,44 @@ export function DocumentationPanel({ selectedFile, summaryData, isSummarizing, o
                                     </section>
                                 )}
 
-                                {/* Purpose Block */}
-                                <section className="relative group">
-                                    <div className="absolute -left-6 top-0 bottom-0 w-1 bg-gradient-to-b from-accent-primary to-transparent opacity-50" />
-                                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-secondary mb-3 flex items-center gap-2">
-                                        <Layers className="h-3 w-3" /> Core Purpose
-                                    </h3>
-                                    <p className="text-sm leading-relaxed text-text-primary font-medium bg-white/5 p-4 rounded-lg border border-white/5 shadow-inner">
+                                {/* Purpose & Role Block */}
+                                <section className="relative group p-4 rounded-lg bg-white/5 border border-white/5 shadow-inner">
+                                    <div className="absolute -left-2 top-4 bottom-4 w-1 bg-gradient-to-b from-accent-primary to-transparent opacity-50 rounded-full" />
+
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-secondary flex items-center gap-2">
+                                            <Layers className="h-3 w-3" /> Architecture Role
+                                        </h3>
+                                        <span className="px-2 py-0.5 bg-accent-primary/20 text-accent-primary rounded text-[10px] font-bold flex items-center gap-1 border border-accent-primary/30">
+                                            <ShieldCheck className="h-3 w-3" /> {summaryData.architectureRole}
+                                        </span>
+                                    </div>
+
+                                    <p className="text-sm leading-relaxed text-text-primary font-medium mb-4 italic text-opacity-90">
                                         &quot;{summaryData.purpose}&quot;
                                     </p>
+
+                                    {summaryData.designPatterns && summaryData.designPatterns.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 pt-3 border-t border-white/5">
+                                            {summaryData.designPatterns.map((pattern, idx) => (
+                                                <span key={idx} className="flex items-center gap-1 px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-md text-[9px] font-bold">
+                                                    <Box className="h-2.5 w-2.5" /> {pattern}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
                                 </section>
+
+                                {summaryData.technicalDebt && (
+                                    <section className="bg-red-500/5 p-3 rounded-lg border border-red-500/10">
+                                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-red-400 mb-2 flex items-center gap-2">
+                                            <Activity className="h-3 w-3" /> Technical Debt Observation
+                                        </h3>
+                                        <p className="text-[11px] text-red-200/70 leading-relaxed italic">
+                                            {summaryData.technicalDebt}
+                                        </p>
+                                    </section>
+                                )}
 
                                 {/* Responsibilities */}
                                 <section>

@@ -4,6 +4,9 @@ export interface AISummary {
     purpose: string;
     responsibilities: string[];
     relationships: string;
+    architectureRole: string;
+    designPatterns: string[];
+    technicalDebt?: string;
 }
 
 export class AIService {
@@ -31,15 +34,24 @@ export class AIService {
 
     private async getRealSummary(fileName: string, content: string): Promise<AISummary> {
         try {
-            const prompt = `You are a senior software architect. Analyze the provided code and summarize it concisely for an architectural diagram.
+            const prompt = `You are a senior software architect. Analyze the provided code and summarize it for an architectural blueprint.
             
             Analyze this file: ${fileName}
             
-            Return ONLY a valid JSON object with the following structure:
+            Identify:
+            1. **Purpose**: Core function.
+            2. **Architecture Role**: (e.g., Presentation, Domain/Business Logic, Infrastructure, Data Access, Utility, Orchestration).
+            3. **Design Patterns**: Detect patterns like Provider, Factory, Observer, Strategy, Repository, Hook, etc.
+            4. **Technical Debt**: Spot high coupling, long methods, or logic smells.
+            
+            Return ONLY a valid JSON object:
             {
-              "purpose": "A brief sentence on what this file does",
-              "responsibilities": ["list", "of", "core", "functions"],
-              "relationships": "How it interacts with other parts of the system"
+              "purpose": "brief sentence",
+              "responsibilities": ["list", "of", "core", "tasks"],
+              "relationships": "interaction summary",
+              "architectureRole": "Layer Name",
+              "designPatterns": ["Pattern1", "Pattern2"],
+              "technicalDebt": "optional observation"
             }
             
             Content:
@@ -49,7 +61,6 @@ export class AIService {
             const response = await result.response;
             const text = response.text();
 
-            // Extract JSON from potentially markdown-wrapped response
             const jsonMatch = text.match(/\{[\s\S]*\}/);
             const cleanJson = jsonMatch ? jsonMatch[0] : "{}";
 
@@ -57,7 +68,10 @@ export class AIService {
             return {
                 purpose: raw.purpose || "No purpose identified.",
                 responsibilities: raw.responsibilities || ["Analyzed logic flow"],
-                relationships: raw.relationships || "Internal module"
+                relationships: raw.relationships || "Internal module",
+                architectureRole: raw.architectureRole || "Logic",
+                designPatterns: raw.designPatterns || [],
+                technicalDebt: raw.technicalDebt
             };
         } catch (e) {
             console.error("Gemini Error:", e);
@@ -86,7 +100,9 @@ export class AIService {
                 "Processes internal data transformations",
                 "Exports shared logic units"
             ],
-            relationships: "Actively consumed by higher-level orchestrators."
+            relationships: "Actively consumed by higher-level orchestrators.",
+            architectureRole: fileName.endsWith('.tsx') ? "Presentation" : "Logic",
+            designPatterns: hasState ? ["React State"] : []
         };
     }
 

@@ -15,6 +15,9 @@ export interface SummaryData {
     relationships?: string;
     diagram?: string;
     content?: string;
+    architectureRole?: string;
+    designPatterns?: string[];
+    technicalDebt?: string;
 }
 
 export interface NodeData extends FileData { }
