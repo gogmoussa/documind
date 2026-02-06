@@ -198,34 +198,34 @@ export function VisualMap({
         filteredNodes.map(node => {
             const layoutPosition = layoutedNodes?.get(node.id);
             return ({
-            ...node,
-            position: layoutPosition || node.position,
-            style: {
-                ...node.style,
-                opacity: (focusedNode || hoveredNode) ? (impactElements.nodes.has(node.id) ? 1 : 0.12) : 1,
-                border: highlightHotspots && hotspotIds.has(node.id)
-                    ? "1px solid rgba(248,113,113,0.9)"
-                    : node.style?.border,
-                boxShadow: highlightHotspots && hotspotIds.has(node.id)
-                    ? "0 0 16px rgba(248,113,113,0.5)"
-                    : node.style?.boxShadow,
-            }
-        });
+                ...node,
+                position: layoutPosition || node.position,
+                style: {
+                    ...node.style,
+                    opacity: (focusedNode || hoveredNode) ? (impactElements.nodes.has(node.id) ? 1 : 0.12) : 1,
+                    border: highlightHotspots && hotspotIds.has(node.id)
+                        ? "1px solid rgba(248,113,113,0.9)"
+                        : node.style?.border,
+                    boxShadow: highlightHotspots && hotspotIds.has(node.id)
+                        ? "0 0 16px rgba(248,113,113,0.5)"
+                        : node.style?.boxShadow,
+                }
+            });
         }), [filteredNodes, hoveredNode, focusedNode, impactElements, highlightHotspots, hotspotIds, layoutedNodes]);
 
     const styledEdges = useMemo(() =>
         filteredEdges
             .filter(edge => filteredNodeIds.has(edge.source) && filteredNodeIds.has(edge.target))
             .map(edge => ({
-            ...edge,
-            animated: (focusedNode || hoveredNode) ? impactElements.edges.has(edge.id) : edge.animated,
-            style: {
-                ...edge.style,
-                stroke: (focusedNode || hoveredNode) ? (impactElements.edges.has(edge.id) ? '#00f2ff' : '#27272a') : '#52525b',
-                strokeWidth: (focusedNode || hoveredNode) ? (impactElements.edges.has(edge.id) ? 3 : 1) : 1.5,
-                opacity: (focusedNode || hoveredNode) ? (impactElements.edges.has(edge.id) ? 1 : 0.05) : 0.6,
-            }
-        })), [filteredEdges, filteredNodeIds, hoveredNode, focusedNode, impactElements]);
+                ...edge,
+                animated: (focusedNode || hoveredNode) ? impactElements.edges.has(edge.id) : edge.animated,
+                style: {
+                    ...edge.style,
+                    stroke: (focusedNode || hoveredNode) ? (impactElements.edges.has(edge.id) ? '#00f2ff' : '#27272a') : '#52525b',
+                    strokeWidth: (focusedNode || hoveredNode) ? (impactElements.edges.has(edge.id) ? 3 : 1) : 1.5,
+                    opacity: (focusedNode || hoveredNode) ? (impactElements.edges.has(edge.id) ? 1 : 0.05) : 0.6,
+                }
+            })), [filteredEdges, filteredNodeIds, hoveredNode, focusedNode, impactElements]);
 
     useEffect(() => {
         if (filteredNodes.length > 0 && !isScanning) {
@@ -725,21 +725,6 @@ export function VisualMap({
                             </button>
                         </Panel>
                     )}
-
-                    <Panel position="bottom-right" className="m-8 flex flex-col items-end gap-4">
-                        <button
-                            onClick={() => setShowLegend(prev => !prev)}
-                            className="flex items-center gap-3 px-4 py-2.5 bg-white/5 hover:bg-white/10 backdrop-blur-md border border-border-subtle rounded-full text-[11px] font-bold text-text-secondary transition-all"
-                        >
-                            <Layers className="w-4 h-4" /> {showLegend ? "Hide" : "Show"} Legend
-                        </button>
-                        <button
-                            onClick={() => onLayoutChange?.(currentLayout || { direction: 'TB', edgeType: 'smoothstep' })}
-                            className="flex items-center gap-3 px-4 py-2.5 bg-accent-primary/10 hover:bg-accent-primary/20 backdrop-blur-md border border-accent-primary/30 rounded-full text-[11px] font-bold text-accent-primary transition-all hover:shadow-[0_0_20px_#00f2ff33] group"
-                        >
-                            <Zap className="w-4 h-4 group-hover:rotate-12 transition-transform" /> Re-Layout Map
-                        </button>
-                    </Panel>
 
                     {showLegend && (
                         <Panel position="bottom-left" className="mb-24 ml-6">
