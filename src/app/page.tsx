@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
     ReactFlowProvider,
@@ -40,6 +40,21 @@ function DocuMindApp() {
     const [error, setError] = useState<string | null>(null);
     const [layoutConfig, setLayoutConfig] = useState({ direction: 'TB', edgeType: 'smoothstep' });
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [recentPaths, setRecentPaths] = useState<string[]>([]);
+    const [searchQuery, setSearchQuery] = useState("");
+
+    useEffect(() => {
+        const storedPaths = localStorage.getItem("documind:recentPaths");
+        const lastPath = localStorage.getItem("documind:lastPath");
+        if (storedPaths) {
+            try {
+                setRecentPaths(JSON.parse(storedPaths));
+            } catch {
+                setRecentPaths([]);
+            }
+        }
+        if (lastPath) setRepoPath(lastPath);
+    }, []);
 
     const applyLayout = useCallback((currentNodes: any[], currentEdges: any[], config: { direction: string, edgeType: string }) => {
         const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
@@ -152,6 +167,10 @@ function DocuMindApp() {
                 setNodes(layoutedNodes);
                 setEdges(layoutedEdges);
                 setRepoStats(data.stats);
+                const updatedRecents = [repoPath, ...recentPaths.filter(path => path !== repoPath)].slice(0, 5);
+                setRecentPaths(updatedRecents);
+                localStorage.setItem("documind:recentPaths", JSON.stringify(updatedRecents));
+                localStorage.setItem("documind:lastPath", repoPath);
 
                 setTimeout(() => {
                     fitView({ padding: 0.2, duration: 1500 });
@@ -206,6 +225,12 @@ function DocuMindApp() {
                 handleScan={handleScan}
                 isScanning={isScanning}
                 toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+                recentPaths={recentPaths}
+                onSelectRecent={(path) => setRepoPath(path)}
+                onClearRecents={() => {
+                    setRecentPaths([]);
+                    localStorage.removeItem("documind:recentPaths");
+                }}
             />
 
             <div className="flex flex-1 overflow-hidden">
@@ -218,26 +243,34 @@ function DocuMindApp() {
                             transition={{ type: "spring", damping: 20, stiffness: 100 }}
                             className="overflow-hidden flex"
                         >
-                            <Sidebar nodes={nodes} onNodeClick={onNodeClick} stats={repoStats} />
+                            <Sidebar
+                                nodes={nodes}
+                                onNodeClick={onNodeClick}
+                                stats={repoStats}
+                                searchQuery={searchQuery}
+                                onSearchChange={setSearchQuery}
+                            />
                         </motion.div>
                     )}
                 </AnimatePresence>
 
                 <div className="relative flex-1 bg-background-primary overflow-hidden h-full">
-                    <VisualMap
-                        nodes={nodes}
-                        edges={edges}
-                        onNodesChange={onNodesChange}
-                        onEdgesChange={onEdgesChange}
-                        onNodeClick={onNodeClick}
-                        isScanning={isScanning}
-                        scanPercent={scanPercent}
-                        scanStep={scanStep}
-                        error={error}
-                        stats={repoStats}
-                        onLayoutChange={onLayoutChange}
-                        currentLayout={layoutConfig}
-                    />
+                        <VisualMap
+                            nodes={nodes}
+                            edges={edges}
+                            onNodesChange={onNodesChange}
+                            onEdgesChange={onEdgesChange}
+                            onNodeClick={onNodeClick}
+                            isScanning={isScanning}
+                            scanPercent={scanPercent}
+                            scanStep={scanStep}
+                            error={error}
+                            stats={repoStats}
+                            onLayoutChange={onLayoutChange}
+                            currentLayout={layoutConfig}
+                            searchTerm={searchQuery}
+                            onSearchTermChange={setSearchQuery}
+                        />
 
                     <AnimatePresence>
                         {selectedFile && (

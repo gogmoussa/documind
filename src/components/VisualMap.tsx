@@ -8,6 +8,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { NodeData } from "@/types";
 import { AIAssistant } from "./AIAssistant";
 import { ArchitectureNode } from "./ArchitectureNode";
+import { getLayoutedElements } from "@/lib/layout";
 
 interface VisualMapProps {
     nodes: any[];
@@ -22,6 +23,8 @@ interface VisualMapProps {
     stats?: any;
     onLayoutChange?: (options: { direction: string, edgeType: string }) => void;
     currentLayout?: { direction: string, edgeType: string };
+    searchTerm: string;
+    onSearchTermChange: (value: string) => void;
 }
 
 const nodeTypes = {
@@ -40,7 +43,9 @@ export function VisualMap({
     error,
     stats,
     onLayoutChange,
-    currentLayout
+    currentLayout,
+    searchTerm,
+    onSearchTermChange
 }: VisualMapProps) {
     const { fitView } = useReactFlow();
     const [hoveredNode, setHoveredNode] = useState<string | null>(null);
@@ -52,10 +57,11 @@ export function VisualMap({
     const [hotspotOnly, setHotspotOnly] = useState(false);
     const [highlightHotspots, setHighlightHotspots] = useState(true);
     const [showLegend, setShowLegend] = useState(true);
-    const [searchTerm, setSearchTerm] = useState("");
+    const [autoRelayout, setAutoRelayout] = useState(true);
     const [impactOnly, setImpactOnly] = useState(false);
     const [showConnectedOnly, setShowConnectedOnly] = useState(false);
     const [rightPanelOpen, setRightPanelOpen] = useState(true);
+    const [minimalMode, setMinimalMode] = useState(false);
     const [openSections, setOpenSections] = useState({
         intelligence: true,
         filters: true,
@@ -177,9 +183,23 @@ export function VisualMap({
 
     const filteredNodeIds = useMemo(() => new Set(filteredNodes.map(node => node.id)), [filteredNodes]);
 
+    const layoutedNodes = useMemo(() => {
+        if (!autoRelayout || filteredNodes.length === 0) return null;
+        const { nodes: layouted } = getLayoutedElements(
+            filteredNodes,
+            filteredEdges.map(edge => ({ ...edge, type: currentLayout?.edgeType || "smoothstep" })),
+            { direction: currentLayout?.direction || "TB", ranksep: 120, nodesep: 80 }
+        );
+        const positions = new Map(layouted.map(node => [node.id, node.position]));
+        return positions;
+    }, [autoRelayout, filteredNodes, filteredEdges, currentLayout]);
+
     const styledNodes = useMemo(() =>
-        filteredNodes.map(node => ({
+        filteredNodes.map(node => {
+            const layoutPosition = layoutedNodes?.get(node.id);
+            return ({
             ...node,
+            position: layoutPosition || node.position,
             style: {
                 ...node.style,
                 opacity: (focusedNode || hoveredNode) ? (impactElements.nodes.has(node.id) ? 1 : 0.12) : 1,
@@ -190,7 +210,8 @@ export function VisualMap({
                     ? "0 0 16px rgba(248,113,113,0.5)"
                     : node.style?.boxShadow,
             }
-        })), [filteredNodes, hoveredNode, focusedNode, impactElements, highlightHotspots, hotspotIds]);
+        });
+        }), [filteredNodes, hoveredNode, focusedNode, impactElements, highlightHotspots, hotspotIds, layoutedNodes]);
 
     const styledEdges = useMemo(() =>
         filteredEdges
@@ -241,6 +262,56 @@ export function VisualMap({
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, []);
 
+    useEffect(() => {
+        const storedState = localStorage.getItem("documind:mapUi");
+        if (!storedState) return;
+        try {
+            const parsed = JSON.parse(storedState);
+            if (typeof parsed.rightPanelOpen === "boolean") setRightPanelOpen(parsed.rightPanelOpen);
+            if (typeof parsed.showLegend === "boolean") setShowLegend(parsed.showLegend);
+            if (typeof parsed.highlightHotspots === "boolean") setHighlightHotspots(parsed.highlightHotspots);
+            if (typeof parsed.hotspotOnly === "boolean") setHotspotOnly(parsed.hotspotOnly);
+            if (typeof parsed.impactOnly === "boolean") setImpactOnly(parsed.impactOnly);
+            if (typeof parsed.showConnectedOnly === "boolean") setShowConnectedOnly(parsed.showConnectedOnly);
+            if (typeof parsed.autoRelayout === "boolean") setAutoRelayout(parsed.autoRelayout);
+            if (typeof parsed.minimalMode === "boolean") setMinimalMode(parsed.minimalMode);
+            if (typeof parsed.complexityFilter === "string") setComplexityFilter(parsed.complexityFilter);
+            if (Array.isArray(parsed.selectedRoles)) setSelectedRoles(new Set(parsed.selectedRoles));
+            if (parsed.openSections) setOpenSections(parsed.openSections);
+        } catch {
+            // Ignore malformed state.
+        }
+    }, []);
+
+    useEffect(() => {
+        const state = {
+            rightPanelOpen,
+            showLegend,
+            highlightHotspots,
+            hotspotOnly,
+            impactOnly,
+            showConnectedOnly,
+            autoRelayout,
+            minimalMode,
+            complexityFilter,
+            selectedRoles: Array.from(selectedRoles),
+            openSections
+        };
+        localStorage.setItem("documind:mapUi", JSON.stringify(state));
+    }, [
+        rightPanelOpen,
+        showLegend,
+        highlightHotspots,
+        hotspotOnly,
+        impactOnly,
+        showConnectedOnly,
+        autoRelayout,
+        minimalMode,
+        complexityFilter,
+        selectedRoles,
+        openSections
+    ]);
+
     const toggleRole = (role: string) => {
         setSelectedRoles(prev => {
             const next = new Set(prev);
@@ -256,6 +327,17 @@ export function VisualMap({
     const toggleSection = (section: keyof typeof openSections) => {
         setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
+
+    const filterSummary = useMemo(() => {
+        const parts: string[] = [];
+        if (selectedRoles.size > 0) parts.push(`Roles: ${Array.from(selectedRoles).join(", ")}`);
+        if (complexityFilter !== "all") parts.push(`Complexity: ${complexityFilter}`);
+        if (hotspotOnly) parts.push("Hotspots");
+        if (impactOnly) parts.push("Impact");
+        if (showConnectedOnly) parts.push("Links");
+        if (searchTerm.trim()) parts.push(`Search: ${searchTerm.trim()}`);
+        return parts;
+    }, [selectedRoles, complexityFilter, hotspotOnly, impactOnly, showConnectedOnly, searchTerm]);
 
     return (
         <div className="relative flex-1 bg-background-primary overflow-hidden h-full">
@@ -290,6 +372,27 @@ export function VisualMap({
                         className="!bg-background-secondary/50 !backdrop-blur-md"
                     />
 
+                    {filteredNodes.length === 0 && nodes.length > 0 && (
+                        <Panel position="top-center" className="mt-4">
+                            <div className="rounded-lg border border-border-subtle bg-background-secondary/80 px-4 py-3 text-[10px] uppercase font-bold text-text-secondary shadow-lg">
+                                No results match these filters.
+                                <button
+                                    onClick={() => {
+                                        setSelectedRoles(new Set());
+                                        setComplexityFilter("all");
+                                        setHotspotOnly(false);
+                                        onSearchTermChange("");
+                                        setImpactOnly(false);
+                                        setShowConnectedOnly(false);
+                                    }}
+                                    className="ml-3 text-[9px] text-accent-primary hover:text-white transition-colors"
+                                >
+                                    Clear filters
+                                </button>
+                            </div>
+                        </Panel>
+                    )}
+
                     {rightPanelOpen ? (
                         <Panel position="top-right" className="m-4 flex flex-col gap-3 w-72">
                             <div className="rounded border border-border-subtle bg-background-secondary/80 p-2 backdrop-blur-sm text-[10px] text-text-secondary uppercase font-bold flex items-center justify-between gap-2 shadow-lg">
@@ -297,12 +400,32 @@ export function VisualMap({
                                     <span className="w-2 h-2 rounded-full bg-accent-primary animate-pulse" />
                                     {filteredNodes.length} Objects Live
                                 </div>
-                                <button
-                                    onClick={() => setRightPanelOpen(false)}
-                                    className="text-[9px] text-text-secondary hover:text-text-primary transition-colors"
-                                >
-                                    Hide
-                                </button>
+                                <div className="flex items-center gap-2 text-[9px]">
+                                    <button
+                                        onClick={() => {
+                                            setMinimalMode(prev => {
+                                                const next = !prev;
+                                                setOpenSections({
+                                                    intelligence: true,
+                                                    filters: !next,
+                                                    focus: !next,
+                                                    quickActions: !next
+                                                });
+                                                setShowLegend(!next);
+                                                return next;
+                                            });
+                                        }}
+                                        className="text-text-secondary hover:text-text-primary transition-colors"
+                                    >
+                                        {minimalMode ? "Full" : "Minimal"}
+                                    </button>
+                                    <button
+                                        onClick={() => setRightPanelOpen(false)}
+                                        className="text-text-secondary hover:text-text-primary transition-colors"
+                                    >
+                                        Hide
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="rounded-lg border border-border-subtle bg-background-secondary/70 p-3 text-[10px] text-text-secondary uppercase font-bold shadow-lg space-y-2">
@@ -356,6 +479,12 @@ export function VisualMap({
                                                 </div>
                                             </div>
                                         )}
+                                        {filterSummary.length > 0 && (
+                                            <div className="rounded border border-white/5 px-2 py-1 text-[9px] font-mono">
+                                                <span className="block text-[8px] opacity-60">Filters</span>
+                                                <span className="block text-text-secondary">{filterSummary.join(" · ")}</span>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -404,7 +533,7 @@ export function VisualMap({
                                             <span className="text-[8px] opacity-60">Search</span>
                                             <input
                                                 value={searchTerm}
-                                                onChange={(event) => setSearchTerm(event.target.value)}
+                                                onChange={(event) => onSearchTermChange(event.target.value)}
                                                 placeholder="Filter nodes..."
                                                 className="flex-1 bg-transparent text-[9px] font-mono text-text-primary outline-none placeholder:text-text-secondary/60"
                                             />
@@ -450,6 +579,12 @@ export function VisualMap({
                                                 Links only
                                             </button>
                                         </div>
+                                        <button
+                                            onClick={() => setAutoRelayout(prev => !prev)}
+                                            className={`w-full flex items-center justify-center gap-1.5 px-2 py-1 rounded border text-[9px] font-bold transition-colors ${autoRelayout ? "bg-accent-primary/20 border-accent-primary/30 text-accent-primary" : "border-white/5 text-text-secondary hover:text-text-primary"}`}
+                                        >
+                                            Auto-layout
+                                        </button>
                                     </>
                                 )}
                             </div>
@@ -497,6 +632,28 @@ export function VisualMap({
                                                 </button>
                                             )}
                                         </div>
+                                        {activeNode && (
+                                            <div className="flex flex-wrap gap-2 pt-1 text-[9px]">
+                                                <button
+                                                    onClick={() => setImpactOnly(true)}
+                                                    className="px-2 py-1 rounded border border-white/5 text-text-secondary hover:text-text-primary transition-colors"
+                                                >
+                                                    Focus impact
+                                                </button>
+                                                <button
+                                                    onClick={() => setImpactDirection("upstream")}
+                                                    className="px-2 py-1 rounded border border-white/5 text-text-secondary hover:text-text-primary transition-colors"
+                                                >
+                                                    Upstream
+                                                </button>
+                                                <button
+                                                    onClick={() => setImpactDirection("downstream")}
+                                                    className="px-2 py-1 rounded border border-white/5 text-text-secondary hover:text-text-primary transition-colors"
+                                                >
+                                                    Downstream
+                                                </button>
+                                            </div>
+                                        )}
                                     </>
                                 )}
                             </div>
@@ -518,7 +675,7 @@ export function VisualMap({
                                                     setSelectedRoles(new Set());
                                                     setComplexityFilter("all");
                                                     setHotspotOnly(false);
-                                                    setSearchTerm("");
+                                                    onSearchTermChange("");
                                                     setImpactOnly(false);
                                                     setShowConnectedOnly(false);
                                                     setFocusedNode(null);

@@ -7,17 +7,23 @@ interface SidebarProps {
     nodes: any[];
     onNodeClick: (e: any, node: any) => void;
     stats?: RepositoryStats | null;
+    searchQuery: string;
+    onSearchChange: (value: string) => void;
 }
 
 type SortOption = "name" | "type" | "size";
 
-export function Sidebar({ nodes, onNodeClick, stats }: SidebarProps) {
+export function Sidebar({ nodes, onNodeClick, stats, searchQuery, onSearchChange }: SidebarProps) {
     const [activeTab, setActiveTab] = useState<"exploration" | "pulse">("exploration");
     const [sortBy, setSortBy] = useState<SortOption>("name");
     const [groupByType, setGroupByType] = useState(false);
 
     const processedFiles = useMemo(() => {
         let files = nodes.filter(n => n.type === 'file' || n.type === 'group' || n.type === 'architectureNode' || !n.type);
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            files = files.filter((file) => (file.data?.label || "").toLowerCase().includes(query));
+        }
 
         // Sorting Logic
         files.sort((a, b) => {
@@ -44,7 +50,7 @@ export function Sidebar({ nodes, onNodeClick, stats }: SidebarProps) {
         }
 
         return files;
-    }, [nodes, sortBy, groupByType]);
+    }, [nodes, sortBy, groupByType, searchQuery]);
 
     return (
         <aside className="w-80 border-r border-border-subtle bg-background-secondary/50 flex flex-col z-10 backdrop-blur-sm shadow-2xl">
@@ -85,6 +91,15 @@ export function Sidebar({ nodes, onNodeClick, stats }: SidebarProps) {
                                         </button>
                                     ))}
                                 </div>
+                            </div>
+                            <div className="flex items-center gap-2 rounded border border-white/5 bg-background-primary/40 px-2 py-1">
+                                <span className="text-[8px] text-text-secondary uppercase tracking-widest">Search</span>
+                                <input
+                                    value={searchQuery}
+                                    onChange={(event) => onSearchChange(event.target.value)}
+                                    placeholder="Filter files..."
+                                    className="flex-1 bg-transparent text-[10px] font-mono text-text-primary outline-none placeholder:text-text-secondary/60"
+                                />
                             </div>
                         </motion.div>
                     ) : (null)}
