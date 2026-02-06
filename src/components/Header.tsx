@@ -7,9 +7,12 @@ interface HeaderProps {
     handleScan: () => void;
     isScanning: boolean;
     toggleSidebar: () => void;
+    recentPaths: string[];
+    onSelectRecent: (path: string) => void;
+    onClearRecents: () => void;
 }
 
-export function Header({ repoPath, setRepoPath, handleScan, isScanning, toggleSidebar }: HeaderProps) {
+export function Header({ repoPath, setRepoPath, handleScan, isScanning, toggleSidebar, recentPaths, onSelectRecent, onClearRecents }: HeaderProps) {
     return (
         <header className="flex h-16 items-center justify-between border-b border-border-subtle bg-background-secondary/80 px-8 backdrop-blur-md z-10 select-none">
             <div className="flex items-center gap-6">
@@ -32,15 +35,44 @@ export function Header({ repoPath, setRepoPath, handleScan, isScanning, toggleSi
             </div>
 
             <div className="flex items-center gap-4">
-                <div className="group flex items-center gap-2 rounded-md bg-background-primary border border-border-subtle px-3 py-1.5 focus-within:border-accent-primary transition-all duration-300 w-96 hover:border-white/20">
+                <div className="relative group flex items-center gap-2 rounded-md bg-background-primary border border-border-subtle px-3 py-1.5 focus-within:border-accent-primary transition-all duration-300 w-96 hover:border-white/20">
                     <Search className="h-4 w-4 text-text-secondary group-focus-within:text-accent-primary transition-colors" />
                     <input
                         type="text"
+                        list="recent-paths"
                         value={repoPath}
                         onChange={(e) => setRepoPath(e.target.value)}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter" && repoPath.trim() && !isScanning) {
+                                handleScan();
+                            }
+                        }}
                         placeholder="Local path or Git URL (e.g. C:\Projects\repo or https://github.com/user/repo)..."
                         className="bg-transparent text-sm outline-none placeholder:text-text-secondary/50 w-full text-text-primary font-mono"
                     />
+                    {recentPaths.length > 0 && (
+                        <>
+                            <datalist id="recent-paths">
+                                {recentPaths.map((path) => (
+                                    <option key={path} value={path} />
+                                ))}
+                            </datalist>
+                            <button
+                                type="button"
+                                onClick={() => onSelectRecent(recentPaths[0])}
+                                className="text-[9px] uppercase tracking-widest text-text-secondary hover:text-text-primary"
+                            >
+                                Recent
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onClearRecents}
+                                className="text-[9px] uppercase tracking-widest text-text-secondary hover:text-text-primary"
+                            >
+                                Clear
+                            </button>
+                        </>
+                    )}
                 </div>
                 <button
                     type="button"
