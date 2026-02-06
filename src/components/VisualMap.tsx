@@ -52,6 +52,16 @@ export function VisualMap({
     const [hotspotOnly, setHotspotOnly] = useState(false);
     const [highlightHotspots, setHighlightHotspots] = useState(true);
     const [showLegend, setShowLegend] = useState(true);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [impactOnly, setImpactOnly] = useState(false);
+    const [showConnectedOnly, setShowConnectedOnly] = useState(false);
+    const [rightPanelOpen, setRightPanelOpen] = useState(true);
+    const [openSections, setOpenSections] = useState({
+        intelligence: true,
+        filters: true,
+        focus: true,
+        quickActions: true
+    });
 
     // Blast Radius Logic
     const impactElements = useMemo(() => {
@@ -97,14 +107,20 @@ export function VisualMap({
     }, [stats]);
 
     const availableRoles = useMemo(() => {
-        const roles = new Map<string, string>();
+        const roles = new Map<string, { color: string; count: number }>();
         nodes.forEach(node => {
             const role = node.data?.architectureRole || "Unknown";
-            if (!roles.has(role)) {
-                roles.set(role, node.color || node.style?.background || "#3f3f46");
+            const existing = roles.get(role);
+            if (!existing) {
+                roles.set(role, {
+                    color: node.color || node.style?.background || "#3f3f46",
+                    count: 1
+                });
+            } else {
+                roles.set(role, { ...existing, count: existing.count + 1 });
             }
         });
-        return Array.from(roles.entries()).map(([role, color]) => ({ role, color }));
+        return Array.from(roles.entries()).map(([role, value]) => ({ role, ...value }));
     }, [nodes]);
 
     const activeNode = useMemo(() => {
@@ -113,7 +129,7 @@ export function VisualMap({
         return nodes.find(node => node.id === activeId) || null;
     }, [focusedNode, hoveredNode, nodes]);
 
-    const filteredNodes = useMemo(() => {
+    const baseFilteredNodes = useMemo(() => {
         return nodes.filter((node) => {
             const role = node.data?.architectureRole || "Unknown";
             const roleOk = selectedRoles.size === 0 || selectedRoles.has(role);
@@ -125,15 +141,32 @@ export function VisualMap({
                 || (complexityFilter === "high" && complexity > 20);
 
             const hotspotOk = !hotspotOnly || hotspotIds.has(node.id);
-            return roleOk && complexityOk && hotspotOk;
+            const label = (node.data?.label || node.id || "").toLowerCase();
+            const searchOk = !searchTerm.trim() || label.includes(searchTerm.trim().toLowerCase());
+            const impactOk = !impactOnly || impactElements.nodes.has(node.id);
+            return roleOk && complexityOk && hotspotOk && searchOk && impactOk;
         });
-    }, [nodes, selectedRoles, complexityFilter, hotspotOnly, hotspotIds]);
+    }, [nodes, selectedRoles, complexityFilter, hotspotOnly, hotspotIds, searchTerm, impactOnly, impactElements.nodes]);
 
-    const filteredNodeIds = useMemo(() => new Set(filteredNodes.map(node => node.id)), [filteredNodes]);
+    const baseFilteredNodeIds = useMemo(() => new Set(baseFilteredNodes.map(node => node.id)), [baseFilteredNodes]);
 
     const filteredEdges = useMemo(() => {
-        return edges.filter(edge => filteredNodeIds.has(edge.source) && filteredNodeIds.has(edge.target));
-    }, [edges, filteredNodeIds]);
+        return edges.filter(edge => baseFilteredNodeIds.has(edge.source) && baseFilteredNodeIds.has(edge.target));
+    }, [edges, baseFilteredNodeIds]);
+
+    const connectedNodeIds = useMemo(() => {
+        const connected = new Set<string>();
+        filteredEdges.forEach(edge => {
+            connected.add(edge.source);
+            connected.add(edge.target);
+        });
+        return connected;
+    }, [filteredEdges]);
+
+    const filteredNodes = useMemo(() => {
+        if (!showConnectedOnly) return baseFilteredNodes;
+        return baseFilteredNodes.filter(node => connectedNodeIds.has(node.id));
+    }, [baseFilteredNodes, showConnectedOnly, connectedNodeIds]);
 
     const mapStats = useMemo(() => {
         const hiddenCount = Math.max(nodes.length - filteredNodes.length, 0);
@@ -141,6 +174,8 @@ export function VisualMap({
         const visibleEdges = filteredEdges.length;
         return { hiddenCount, hotspotCount, visibleEdges };
     }, [nodes.length, filteredNodes.length, hotspotIds, filteredEdges.length]);
+
+    const filteredNodeIds = useMemo(() => new Set(filteredNodes.map(node => node.id)), [filteredNodes]);
 
     const styledNodes = useMemo(() =>
         filteredNodes.map(node => ({
@@ -158,7 +193,9 @@ export function VisualMap({
         })), [filteredNodes, hoveredNode, focusedNode, impactElements, highlightHotspots, hotspotIds]);
 
     const styledEdges = useMemo(() =>
-        filteredEdges.map(edge => ({
+        filteredEdges
+            .filter(edge => filteredNodeIds.has(edge.source) && filteredNodeIds.has(edge.target))
+            .map(edge => ({
             ...edge,
             animated: (focusedNode || hoveredNode) ? impactElements.edges.has(edge.id) : edge.animated,
             style: {
@@ -167,7 +204,7 @@ export function VisualMap({
                 strokeWidth: (focusedNode || hoveredNode) ? (impactElements.edges.has(edge.id) ? 3 : 1) : 1.5,
                 opacity: (focusedNode || hoveredNode) ? (impactElements.edges.has(edge.id) ? 1 : 0.05) : 0.6,
             }
-        })), [filteredEdges, hoveredNode, focusedNode, impactElements]);
+        })), [filteredEdges, filteredNodeIds, hoveredNode, focusedNode, impactElements]);
 
     useEffect(() => {
         if (filteredNodes.length > 0 && !isScanning) {
@@ -216,6 +253,10 @@ export function VisualMap({
         });
     };
 
+    const toggleSection = (section: keyof typeof openSections) => {
+        setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+    };
+
     return (
         <div className="relative flex-1 bg-background-primary overflow-hidden h-full">
             {nodes.length > 0 && !isScanning ? (
@@ -249,185 +290,284 @@ export function VisualMap({
                         className="!bg-background-secondary/50 !backdrop-blur-md"
                     />
 
-                    <Panel position="top-right" className="m-4 flex flex-col gap-3 w-72">
-                        <div className="rounded border border-border-subtle bg-background-secondary/80 p-2 backdrop-blur-sm text-[10px] text-text-secondary uppercase font-bold flex items-center gap-2 shadow-lg">
-                            <span className="w-2 h-2 rounded-full bg-accent-primary animate-pulse" />
-                            {filteredNodes.length} Objects Live
-                        </div>
-
-                        <div className="rounded-lg border border-border-subtle bg-background-secondary/70 p-3 text-[10px] text-text-secondary uppercase font-bold shadow-lg space-y-2">
-                            <div className="flex items-center justify-between">
-                                <span>Map Intelligence</span>
-                                <button
-                                    onClick={() => fitView({ padding: 0.2, duration: 600 })}
-                                    className="text-[9px] text-text-secondary hover:text-text-primary transition-colors"
-                                >
-                                    Fit View
-                                </button>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 text-[9px] font-mono">
-                                <div className="rounded border border-white/5 px-2 py-1">
-                                    <span className="block text-[8px] opacity-60">Total</span>
-                                    {nodes.length}
-                                </div>
-                                <div className="rounded border border-white/5 px-2 py-1">
-                                    <span className="block text-[8px] opacity-60">Hidden</span>
-                                    {mapStats.hiddenCount}
-                                </div>
-                                <div className="rounded border border-white/5 px-2 py-1">
-                                    <span className="block text-[8px] opacity-60">Edges</span>
-                                    {mapStats.visibleEdges}
-                                </div>
-                                <div className="rounded border border-white/5 px-2 py-1">
-                                    <span className="block text-[8px] opacity-60">Hotspots</span>
-                                    {mapStats.hotspotCount}
-                                </div>
-                            </div>
-                            {activeNode && (
-                                <div className="rounded border border-white/5 px-2 py-1 text-[9px] font-mono">
-                                    <span className="block text-[8px] opacity-60">Active Node</span>
-                                    <span className="truncate block">{activeNode.data?.label || activeNode.id}</span>
-                                    <div className="flex justify-between text-[8px] opacity-70 mt-1">
-                                        <span>Impact</span>
-                                        <span>{impactElements.nodes.size} nodes · {impactElements.edges.size} edges</span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="rounded-lg border border-border-subtle bg-background-secondary/70 p-3 text-[10px] text-text-secondary uppercase font-bold shadow-lg space-y-3">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-text-secondary">
-                                    <Filter className="h-3 w-3" /> Filters
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        setSelectedRoles(new Set());
-                                        setComplexityFilter("all");
-                                        setHotspotOnly(false);
-                                    }}
-                                    className="text-[9px] text-text-secondary hover:text-text-primary transition-colors"
-                                >
-                                    Reset
-                                </button>
-                            </div>
-
-                            <div className="flex flex-wrap gap-2">
-                                {availableRoles.map(({ role }) => {
-                                    const isActive = selectedRoles.has(role) || selectedRoles.size === 0;
-                                    return (
-                                        <button
-                                            key={role}
-                                            onClick={() => toggleRole(role)}
-                                            className={`px-2 py-1 rounded border text-[9px] font-bold transition-colors ${isActive && selectedRoles.size > 0 ? "bg-accent-primary/20 border-accent-primary/30 text-accent-primary" : "border-white/5 text-text-secondary hover:text-text-primary"}`}
-                                        >
-                                            {role}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                {(["all", "low", "medium", "high"] as const).map((tier) => (
-                                    <button
-                                        key={tier}
-                                        onClick={() => setComplexityFilter(tier)}
-                                        className={`px-2 py-1 rounded border text-[9px] font-bold transition-colors ${complexityFilter === tier ? "bg-yellow-500/20 border-yellow-400/40 text-yellow-300" : "border-white/5 text-text-secondary hover:text-text-primary"}`}
-                                    >
-                                        {tier}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="flex items-center justify-between">
-                                <button
-                                    onClick={() => setHotspotOnly(prev => !prev)}
-                                    className={`flex items-center gap-1.5 px-2 py-1 rounded border text-[9px] font-bold transition-colors ${hotspotOnly ? "bg-red-500/20 border-red-400/40 text-red-300" : "border-white/5 text-text-secondary hover:text-text-primary"}`}
-                                >
-                                    <Flame className="h-3 w-3" /> Hotspots only
-                                </button>
-                                <button
-                                    onClick={() => setHighlightHotspots(prev => !prev)}
-                                    className={`flex items-center gap-1.5 px-2 py-1 rounded border text-[9px] font-bold transition-colors ${highlightHotspots ? "bg-red-500/10 border-red-400/30 text-red-200" : "border-white/5 text-text-secondary hover:text-text-primary"}`}
-                                >
-                                    <Eye className="h-3 w-3" /> Highlight
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="rounded-lg border border-border-subtle bg-background-secondary/70 p-3 text-[10px] text-text-secondary uppercase font-bold shadow-lg space-y-2">
-                            <div className="flex items-center justify-between">
+                    {rightPanelOpen ? (
+                        <Panel position="top-right" className="m-4 flex flex-col gap-3 w-72">
+                            <div className="rounded border border-border-subtle bg-background-secondary/80 p-2 backdrop-blur-sm text-[10px] text-text-secondary uppercase font-bold flex items-center justify-between gap-2 shadow-lg">
                                 <div className="flex items-center gap-2">
-                                    <Target className="h-3 w-3" /> Focus / Trace
+                                    <span className="w-2 h-2 rounded-full bg-accent-primary animate-pulse" />
+                                    {filteredNodes.length} Objects Live
                                 </div>
                                 <button
-                                    onClick={() => setFocusMode(prev => !prev)}
-                                    className={`px-2 py-1 rounded border text-[9px] font-bold transition-colors ${focusMode ? "bg-accent-primary/20 border-accent-primary/30 text-accent-primary" : "border-white/5 text-text-secondary hover:text-text-primary"}`}
+                                    onClick={() => setRightPanelOpen(false)}
+                                    className="text-[9px] text-text-secondary hover:text-text-primary transition-colors"
                                 >
-                                    {focusMode ? "On" : "Off"}
+                                    Hide
                                 </button>
                             </div>
-                            <div className="flex items-center gap-2">
-                                {(["both", "upstream", "downstream"] as const).map((direction) => (
-                                    <button
-                                        key={direction}
-                                        onClick={() => setImpactDirection(direction)}
-                                        className={`px-2 py-1 rounded border text-[9px] font-bold transition-colors ${impactDirection === direction ? "bg-accent-primary/20 border-accent-primary/30 text-accent-primary" : "border-white/5 text-text-secondary hover:text-text-primary"}`}
-                                    >
-                                        {direction}
-                                    </button>
-                                ))}
-                            </div>
-                            <div className="flex items-center justify-between text-[9px] text-text-secondary">
-                                <span>{focusedNode ? "Focused" : "No focus"}</span>
-                                {focusedNode && (
-                                    <button
-                                        onClick={() => setFocusedNode(null)}
-                                        className="text-[9px] text-text-secondary hover:text-text-primary transition-colors"
-                                    >
-                                        Clear
-                                    </button>
+
+                            <div className="rounded-lg border border-border-subtle bg-background-secondary/70 p-3 text-[10px] text-text-secondary uppercase font-bold shadow-lg space-y-2">
+                                <button
+                                    onClick={() => toggleSection("intelligence")}
+                                    className="flex w-full items-center justify-between text-left"
+                                >
+                                    <span>Map Intelligence</span>
+                                    <span className="text-[9px] text-text-secondary">{openSections.intelligence ? "−" : "+"}</span>
+                                </button>
+                                {openSections.intelligence && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[9px] opacity-70">Overview</span>
+                                            <button
+                                                onClick={() => fitView({ padding: 0.2, duration: 600 })}
+                                                className="text-[9px] text-text-secondary hover:text-text-primary transition-colors"
+                                            >
+                                                Fit View
+                                            </button>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 text-[9px] font-mono">
+                                            <div className="rounded border border-white/5 px-2 py-1">
+                                                <span className="block text-[8px] opacity-60">Total</span>
+                                                {nodes.length}
+                                            </div>
+                                            <div className="rounded border border-white/5 px-2 py-1">
+                                                <span className="block text-[8px] opacity-60">Hidden</span>
+                                                {mapStats.hiddenCount}
+                                            </div>
+                                            <div className="rounded border border-white/5 px-2 py-1">
+                                                <span className="block text-[8px] opacity-60">Edges</span>
+                                                {mapStats.visibleEdges}
+                                            </div>
+                                            <div className="rounded border border-white/5 px-2 py-1">
+                                                <span className="block text-[8px] opacity-60">Hotspots</span>
+                                                {mapStats.hotspotCount}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center justify-between text-[9px] font-mono">
+                                            <span className="opacity-60">Focus Mode</span>
+                                            <span className={focusMode ? "text-accent-primary" : "text-text-secondary"}>{focusMode ? "Enabled" : "Idle"}</span>
+                                        </div>
+                                        {activeNode && (
+                                            <div className="rounded border border-white/5 px-2 py-1 text-[9px] font-mono">
+                                                <span className="block text-[8px] opacity-60">Active Node</span>
+                                                <span className="truncate block">{activeNode.data?.label || activeNode.id}</span>
+                                                <div className="flex justify-between text-[8px] opacity-70 mt-1">
+                                                    <span>Impact</span>
+                                                    <span>{impactElements.nodes.size} nodes · {impactElements.edges.size} edges</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
-                        </div>
 
-                        <div className="rounded-lg border border-border-subtle bg-background-secondary/70 p-3 text-[10px] text-text-secondary uppercase font-bold shadow-lg space-y-2">
-                            <div className="flex items-center justify-between">
-                                <span>Quick Actions</span>
+                            <div className="rounded-lg border border-border-subtle bg-background-secondary/70 p-3 text-[10px] text-text-secondary uppercase font-bold shadow-lg space-y-3">
                                 <button
-                                    onClick={() => {
-                                        setSelectedRoles(new Set());
-                                        setComplexityFilter("all");
-                                        setHotspotOnly(false);
-                                        setFocusedNode(null);
-                                    }}
-                                    className="text-[9px] text-text-secondary hover:text-text-primary transition-colors"
+                                    onClick={() => toggleSection("filters")}
+                                    className="flex w-full items-center justify-between text-left"
                                 >
-                                    Clear All
+                                    <div className="flex items-center gap-2 text-text-secondary">
+                                        <Filter className="h-3 w-3" /> Filters
+                                    </div>
+                                    <span className="text-[9px] text-text-secondary">{openSections.filters ? "−" : "+"}</span>
                                 </button>
+                                {openSections.filters && (
+                                    <>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[9px] opacity-70">Roles</span>
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedRoles(new Set());
+                                                    setComplexityFilter("all");
+                                                    setHotspotOnly(false);
+                                                }}
+                                                className="text-[9px] text-text-secondary hover:text-text-primary transition-colors"
+                                            >
+                                                Reset
+                                            </button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {availableRoles.map(({ role, count }) => {
+                                                const isActive = selectedRoles.has(role) || selectedRoles.size === 0;
+                                                return (
+                                                    <button
+                                                        key={role}
+                                                        onClick={() => toggleRole(role)}
+                                                        className={`px-2 py-1 rounded border text-[9px] font-bold transition-colors ${isActive && selectedRoles.size > 0 ? "bg-accent-primary/20 border-accent-primary/30 text-accent-primary" : "border-white/5 text-text-secondary hover:text-text-primary"}`}
+                                                    >
+                                                        {role} <span className="opacity-60">({count})</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <div className="flex items-center gap-2 rounded border border-white/5 bg-background-primary/40 px-2 py-1">
+                                            <span className="text-[8px] opacity-60">Search</span>
+                                            <input
+                                                value={searchTerm}
+                                                onChange={(event) => setSearchTerm(event.target.value)}
+                                                placeholder="Filter nodes..."
+                                                className="flex-1 bg-transparent text-[9px] font-mono text-text-primary outline-none placeholder:text-text-secondary/60"
+                                            />
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            {(["all", "low", "medium", "high"] as const).map((tier) => (
+                                                <button
+                                                    key={tier}
+                                                    onClick={() => setComplexityFilter(tier)}
+                                                    className={`px-2 py-1 rounded border text-[9px] font-bold transition-colors ${complexityFilter === tier ? "bg-yellow-500/20 border-yellow-400/40 text-yellow-300" : "border-white/5 text-text-secondary hover:text-text-primary"}`}
+                                                >
+                                                    {tier}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <div className="flex items-center justify-between">
+                                            <button
+                                                onClick={() => setHotspotOnly(prev => !prev)}
+                                                className={`flex items-center gap-1.5 px-2 py-1 rounded border text-[9px] font-bold transition-colors ${hotspotOnly ? "bg-red-500/20 border-red-400/40 text-red-300" : "border-white/5 text-text-secondary hover:text-text-primary"}`}
+                                            >
+                                                <Flame className="h-3 w-3" /> Hotspots only
+                                            </button>
+                                            <button
+                                                onClick={() => setHighlightHotspots(prev => !prev)}
+                                                className={`flex items-center gap-1.5 px-2 py-1 rounded border text-[9px] font-bold transition-colors ${highlightHotspots ? "bg-red-500/10 border-red-400/30 text-red-200" : "border-white/5 text-text-secondary hover:text-text-primary"}`}
+                                            >
+                                                <Eye className="h-3 w-3" /> Highlight
+                                            </button>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button
+                                                onClick={() => setImpactOnly(prev => !prev)}
+                                                className={`flex items-center justify-center gap-1.5 px-2 py-1 rounded border text-[9px] font-bold transition-colors ${impactOnly ? "bg-accent-primary/20 border-accent-primary/30 text-accent-primary" : "border-white/5 text-text-secondary hover:text-text-primary"}`}
+                                            >
+                                                <Target className="h-3 w-3" /> Impact only
+                                            </button>
+                                            <button
+                                                onClick={() => setShowConnectedOnly(prev => !prev)}
+                                                className={`flex items-center justify-center gap-1.5 px-2 py-1 rounded border text-[9px] font-bold transition-colors ${showConnectedOnly ? "bg-accent-primary/20 border-accent-primary/30 text-accent-primary" : "border-white/5 text-text-secondary hover:text-text-primary"}`}
+                                            >
+                                                Links only
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
                             </div>
-                            <div className="flex flex-wrap gap-2">
+
+                            <div className="rounded-lg border border-border-subtle bg-background-secondary/70 p-3 text-[10px] text-text-secondary uppercase font-bold shadow-lg space-y-2">
                                 <button
-                                    onClick={() => setImpactDirection("upstream")}
-                                    className="px-2 py-1 rounded border border-white/5 text-[9px] font-bold text-text-secondary hover:text-text-primary transition-colors"
+                                    onClick={() => toggleSection("focus")}
+                                    className="flex w-full items-center justify-between text-left"
                                 >
-                                    Upstream
+                                    <div className="flex items-center gap-2">
+                                        <Target className="h-3 w-3" /> Focus / Trace
+                                    </div>
+                                    <span className="text-[9px] text-text-secondary">{openSections.focus ? "−" : "+"}</span>
                                 </button>
-                                <button
-                                    onClick={() => setImpactDirection("downstream")}
-                                    className="px-2 py-1 rounded border border-white/5 text-[9px] font-bold text-text-secondary hover:text-text-primary transition-colors"
-                                >
-                                    Downstream
-                                </button>
-                                <button
-                                    onClick={() => setImpactDirection("both")}
-                                    className="px-2 py-1 rounded border border-white/5 text-[9px] font-bold text-text-secondary hover:text-text-primary transition-colors"
-                                >
-                                    Both
-                                </button>
+                                {openSections.focus && (
+                                    <>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[9px] opacity-70">Mode</span>
+                                            <button
+                                                onClick={() => setFocusMode(prev => !prev)}
+                                                className={`px-2 py-1 rounded border text-[9px] font-bold transition-colors ${focusMode ? "bg-accent-primary/20 border-accent-primary/30 text-accent-primary" : "border-white/5 text-text-secondary hover:text-text-primary"}`}
+                                            >
+                                                {focusMode ? "On" : "Off"}
+                                            </button>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {(["both", "upstream", "downstream"] as const).map((direction) => (
+                                                <button
+                                                    key={direction}
+                                                    onClick={() => setImpactDirection(direction)}
+                                                    className={`px-2 py-1 rounded border text-[9px] font-bold transition-colors ${impactDirection === direction ? "bg-accent-primary/20 border-accent-primary/30 text-accent-primary" : "border-white/5 text-text-secondary hover:text-text-primary"}`}
+                                                >
+                                                    {direction}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="flex items-center justify-between text-[9px] text-text-secondary">
+                                            <span>{focusedNode ? "Focused" : "No focus"}</span>
+                                            {focusedNode && (
+                                                <button
+                                                    onClick={() => setFocusedNode(null)}
+                                                    className="text-[9px] text-text-secondary hover:text-text-primary transition-colors"
+                                                >
+                                                    Clear
+                                                </button>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
                             </div>
-                        </div>
-                    </Panel>
+
+                            <div className="rounded-lg border border-border-subtle bg-background-secondary/70 p-3 text-[10px] text-text-secondary uppercase font-bold shadow-lg space-y-2">
+                                <button
+                                    onClick={() => toggleSection("quickActions")}
+                                    className="flex w-full items-center justify-between text-left"
+                                >
+                                    <span>Quick Actions</span>
+                                    <span className="text-[9px] text-text-secondary">{openSections.quickActions ? "−" : "+"}</span>
+                                </button>
+                                {openSections.quickActions && (
+                                    <>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[9px] opacity-70">Reset</span>
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedRoles(new Set());
+                                                    setComplexityFilter("all");
+                                                    setHotspotOnly(false);
+                                                    setSearchTerm("");
+                                                    setImpactOnly(false);
+                                                    setShowConnectedOnly(false);
+                                                    setFocusedNode(null);
+                                                }}
+                                                className="text-[9px] text-text-secondary hover:text-text-primary transition-colors"
+                                            >
+                                                Clear All
+                                            </button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            <button
+                                                onClick={() => setImpactDirection("upstream")}
+                                                className="px-2 py-1 rounded border border-white/5 text-[9px] font-bold text-text-secondary hover:text-text-primary transition-colors"
+                                            >
+                                                Upstream
+                                            </button>
+                                            <button
+                                                onClick={() => setImpactDirection("downstream")}
+                                                className="px-2 py-1 rounded border border-white/5 text-[9px] font-bold text-text-secondary hover:text-text-primary transition-colors"
+                                            >
+                                                Downstream
+                                            </button>
+                                            <button
+                                                onClick={() => setImpactDirection("both")}
+                                                className="px-2 py-1 rounded border border-white/5 text-[9px] font-bold text-text-secondary hover:text-text-primary transition-colors"
+                                            >
+                                                Both
+                                            </button>
+                                        </div>
+                                        <button
+                                            onClick={() => fitView({ padding: 0.2, duration: 600 })}
+                                            className="w-full px-2 py-1 rounded border border-white/5 text-[9px] font-bold text-text-secondary hover:text-text-primary transition-colors"
+                                        >
+                                            Refresh View
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </Panel>
+                    ) : (
+                        <Panel position="top-right" className="m-4">
+                            <button
+                                onClick={() => setRightPanelOpen(true)}
+                                className="rounded-full border border-border-subtle bg-background-secondary/80 px-3 py-2 text-[10px] uppercase font-bold text-text-secondary shadow-lg hover:text-text-primary transition-colors"
+                            >
+                                Show Panels
+                            </button>
+                        </Panel>
+                    )}
 
                     <Panel position="bottom-right" className="m-8 flex flex-col items-end gap-4">
                         <button
@@ -452,7 +592,7 @@ export function VisualMap({
                                     <span className="text-[9px]">Shortcuts</span>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
-                                    {availableRoles.map(({ role, color }) => (
+                                    {availableRoles.map(({ role, color, count }) => (
                                         <button
                                             key={role}
                                             onClick={() => toggleRole(role)}
@@ -460,6 +600,7 @@ export function VisualMap({
                                         >
                                             <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
                                             <span className="truncate">{role}</span>
+                                            <span className="ml-auto text-[9px] opacity-60">{count}</span>
                                         </button>
                                     ))}
                                 </div>
