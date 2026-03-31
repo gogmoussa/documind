@@ -3,7 +3,7 @@ import { AIService } from "@/lib/ai/ai-service";
 
 export async function POST(req: NextRequest) {
     try {
-        const { context, failedDiagram, errorMsg } = await req.json();
+        const { context, failedDiagram, errorMsg, mode } = await req.json();
 
         const aiService = new AIService();
         let diagram;
@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
         if (failedDiagram && errorMsg) {
             diagram = await aiService.fixSystemFlow(failedDiagram, errorMsg);
         } else {
-            diagram = await aiService.generateSystemFlow(context || "");
+            diagram = await aiService.generateSystemFlow(context || "", mode || 'flow');
         }
 
         return NextResponse.json({ diagram });

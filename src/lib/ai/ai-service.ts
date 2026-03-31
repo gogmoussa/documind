@@ -158,25 +158,59 @@ export class AIService {
         }
     }
 
-    public async generateSystemFlow(context: string): Promise<string> {
+    public async generateSystemFlow(context: string, mode: 'flow' | 'sequence' | 'er' = 'flow'): Promise<string> {
         if (!this.model) {
             return `sequenceDiagram\n    participant System\n    System->>System: Static Mode (No AI Key)\n    Note right of System: Provide API key for Global Flow analysis`;
         }
         
         try {
-            const prompt = `You are a technical architect. Based on the following repository analysis, generate a **Mermaid Flowchart** (graph TD) representing the primary data flow and structural layout between modules.
+            let prompt = "";
+            
+            if (mode === 'flow') {
+                prompt = `You are a technical architect. Based on the following repository analysis, generate a **Mermaid Flowchart** (graph TD) representing the primary data flow and structural layout between modules.
 
-            RULES:
-            1. Use "graph TD" as the first line.
-            2. Modules/Nodes MUST have safe IDs (alphanumeric only).
-            3. Use descriptive labels like: NodeA[Visual Map Layer] --> NodeB[Documentation Engine].
-            4. Do NOT include markdown code blocks (no \`\`\`mermaid or \`\`\`).
-            5. Return ONLY the flowchart code.
+                RULES:
+                1. Use "graph TD" as the first line.
+                2. Modules/Nodes MUST have safe IDs (alphanumeric only).
+                3. Use descriptive labels like: NodeA[Visual Map Layer] --> NodeB[Documentation Engine].
+                4. Do NOT include markdown code blocks.
+                5. Return ONLY the flowchart code.`;
+            } else if (mode === 'sequence') {
+                prompt = `You are a technical architect. Based on the following repository analysis, generate a **Mermaid Sequence Diagram** (sequenceDiagram) representing a typical execution sequence or logic flow between main modules.
 
-            Context (Nodes and Edges):
-            ${context.substring(0, 8000)}`;
+                RULES:
+                1. Use "sequenceDiagram" as the first line.
+                2. Participant names MUST be alphanumeric only.
+                3. Show clear arrows: ->>, -->>, etc.
+                4. Do NOT include markdown code blocks.
+                5. Return ONLY the diagram code.`;
+            } else if (mode === 'er') {
+                prompt = `You are a technical architect. Based on the following repository analysis, generate a **Mermaid Entity Relationship Diagram** (erDiagram) representing the data structures, state shapes, or object relationships.
 
-            const result = await this.model.generateContent(prompt);
+                RULES:
+                1. Use "erDiagram" as the first line.
+                2. Do NOT include markdown code blocks.
+                3. Return ONLY the diagram code.`;
+            } else if (mode === 'security') {
+                prompt = `You are a technical architect & security engineer. Perform an **Architectural Security & Risk Audit**.
+                Identify logical vulnerabilities, technical debt, and data leak risks in the structure.
+                
+                Generate a **Mermaid Flowchart (graph TD)** that maps these risks.
+                
+                RULES:
+                1. Use "graph TD" as the first line.
+                2. Use specialized styling for risks:
+                   - Critical risks: style NodeID fill:#f87171,stroke:#000,stroke-width:2px,color:#fff
+                   - Warning/Debt: style NodeID fill:#fbbf24,stroke:#000,color:#000
+                   - Safe Zones: style NodeID fill:#60a5fa,stroke:#000,color:#fff
+                3. Group risks by severity.
+                4. Do NOT include markdown code blocks.
+                5. Return ONLY the diagram code.`;
+            }
+
+            const finalPrompt = `${prompt}\n\nContext (Nodes and Edges):\n${context.substring(0, 8000)}`;
+
+            const result = await this.model.generateContent(finalPrompt);
             const response = await result.response;
             let text = response.text().trim();
             
@@ -203,9 +237,10 @@ export class AIService {
             }
 
             return text.trim() || `sequenceDiagram\n  Note over System: No complex global flow detected`;
-        } catch (e) {
+        } catch (e: any) {
             console.error("Gemini Error generating System Flow:", e);
-            return `sequenceDiagram\n    participant Error\n    Note over Error: Neural Engine failed to generate global flow`;
+            const errMsg = e.message || "Unknown Engine Failure";
+            return `sequenceDiagram\n    participant Error\n    Note over Error: Neural Engine Error: ${errMsg.substring(0, 50)}`;
         }
     }
 
