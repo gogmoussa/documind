@@ -4,6 +4,8 @@
 
 DocuMind is an advanced engineering tool designed to transform complex, opaque codebases into interactive, navigable blueprints. By combining **AST-native static analysis** with **LLM-driven contextual reasoning**, it provides developers and architects with a living map of their system's "Forest" without losing sight of the "Trees."
 
+![Global AI Flow Analysis](public/{293E69A9-BF44-4315-AA8F-547BBF0C5291}.png)
+
 ![System Overview](public/{95506AC4-12E2-4513-8750-A377A766EAA8}.png)
 
 ---
