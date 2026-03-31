@@ -124,8 +124,120 @@ export class AIService {
     }
 
     public async generateMermaid(content: string): Promise<string> {
-        // Simplified Mermaid generator for visualization
-        return `graph TD\n  A[Entry] --> B[Logic]\n  B --> C[Output]`;
+        if (!this.model) {
+            return `sequenceDiagram\n    participant System\n    System->>System: Static Mode (No AI Key)\n    Note right of System: Provide API key for Flow analysis`;
+        }
+
+        try {
+            const prompt = `You are a technical architect. Generate a Mermaid sequence diagram (sequenceDiagram) representing the execution flow or logical steps of the following code.
+            
+            Keep it high-level, focusing on the main functions, state changes, or external calls. 
+            Do NOT include markdown formatting like \`\`\`mermaid or \`\`\`. Start the response directly with "sequenceDiagram" followed by the diagram definition.
+            If the code is too simple, generate a basic flow showing its primary action.
+
+            Code Content:
+            ${content.substring(0, 8000)}`;
+
+            const result = await this.model.generateContent(prompt);
+            const response = await result.response;
+            let text = response.text().trim();
+            
+            // Clean up potentially remaining markdown code blocks
+            if (text.startsWith('\`\`\`mermaid')) {
+                text = text.replace(/^\`\`\`mermaid\n/g, '');
+            }
+            if (text.startsWith('\`\`\`')) {
+                text = text.replace(/^\`\`\`\n/g, '');
+            }
+            text = text.replace(/\n\`\`\`$/g, '');
+
+            return text.trim() || `sequenceDiagram\n  Note over Logic: No complex flow detected`;
+        } catch (e) {
+            console.error("Gemini Error generating Mermaid:", e);
+            return `sequenceDiagram\n    participant Error\n    Note over Error: Neural Engine failed to generate sequence flow`;
+        }
+    }
+
+    public async generateSystemFlow(context: string): Promise<string> {
+        if (!this.model) {
+            return `sequenceDiagram\n    participant System\n    System->>System: Static Mode (No AI Key)\n    Note right of System: Provide API key for Global Flow analysis`;
+        }
+        
+        try {
+            const prompt = `You are a technical architect. Based on the following repository analysis, generate a **Mermaid Flowchart** (graph TD) representing the primary data flow and structural layout between modules.
+
+            RULES:
+            1. Use "graph TD" as the first line.
+            2. Modules/Nodes MUST have safe IDs (alphanumeric only).
+            3. Use descriptive labels like: NodeA[Visual Map Layer] --> NodeB[Documentation Engine].
+            4. Do NOT include markdown code blocks (no \`\`\`mermaid or \`\`\`).
+            5. Return ONLY the flowchart code.
+
+            Context (Nodes and Edges):
+            ${context.substring(0, 8000)}`;
+
+            const result = await this.model.generateContent(prompt);
+            const response = await result.response;
+            let text = response.text().trim();
+            
+            // Improved cleaning logic for various LLM output styles
+            text = text.replace(/```mermaid\n?/g, '')
+                       .replace(/```\n?/g, '')
+                       .trim();
+            
+            // Surgical extraction: Find start and potentially end (if model hallucinated trailing notes)
+            const lines = text.split('\n');
+            const startIndex = lines.findIndex((l: string) => 
+                l.trim().startsWith('sequenceDiagram') || 
+                l.trim().startsWith('graph ') || 
+                l.trim().startsWith('flowchart ')
+            );
+            
+            if (startIndex !== -1) {
+                const diagramLines = lines.slice(startIndex);
+                // Simple heuristic: If a line after sequenceDiagram is just text without Mermaid operators, it's likely junk
+                // but for now, let's just trim trailing markdown artifacts.
+                text = diagramLines.join('\n')
+                    .replace(/```\s*$/g, '') // Remove trailing block
+                    .trim();
+            }
+
+            return text.trim() || `sequenceDiagram\n  Note over System: No complex global flow detected`;
+        } catch (e) {
+            console.error("Gemini Error generating System Flow:", e);
+            return `sequenceDiagram\n    participant Error\n    Note over Error: Neural Engine failed to generate global flow`;
+        }
+    }
+
+    public async fixSystemFlow(failedDiagram: string, errorMsg: string): Promise<string> {
+        if (!this.model) {
+            return failedDiagram;
+        }
+        
+        try {
+            const prompt = `You are a technical architect. The following Mermaid diagram you generated has a syntax error.
+
+            Error Message:
+            ${errorMsg}
+
+            Broken Diagram:
+            ${failedDiagram}
+
+            Please fix the syntax error and return ONLY the corrected Mermaid diagram code. Do NOT include markdown formatting like \`\`\`mermaid or \`\`\`. Start the response directly with the diagram type ("sequenceDiagram" or "graph TD").`;
+
+            const result = await this.model.generateContent(prompt);
+            const response = await result.response;
+            let text = response.text().trim();
+            
+            if (text.startsWith('\`\`\`mermaid')) text = text.replace(/^\`\`\`mermaid\n/g, '');
+            if (text.startsWith('\`\`\`')) text = text.replace(/^\`\`\`\n/g, '');
+            text = text.replace(/\n\`\`\`$/g, '');
+
+            return text.trim();
+        } catch (e) {
+            console.error("Gemini Error fixing System Flow:", e);
+            return `sequenceDiagram\n    participant Error\n    Note over Error: Neural Engine failed to parse correction`;
+        }
     }
 
     public async chat(message: string, context: string): Promise<string> {
